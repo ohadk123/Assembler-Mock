@@ -5,6 +5,7 @@
 *.ent
 *.ext
 Assembler
+unmake.c
 
 # Prerequisites
 *.d
