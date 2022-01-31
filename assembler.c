@@ -22,8 +22,7 @@ int main(int argc, char *argv[])
           if (code == NULL) {printf("\nError occured trying to open file"); continue;}
           fseek(code, 0, SEEK_SET);
           
-          while (fgets(text[t], MAX_LINE, code))
-               printf("%s", text[t]);
+          while (fgets(text[t], MAX_LINE, code));
                
           remove("output.txt");
           free(text);
