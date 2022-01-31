@@ -23,10 +23,32 @@ int main(int argc, char *argv[])
           fseek(code, 0, SEEK_SET);
           
           while (fgets(text[t], MAX_LINE, code));
-               
+
           remove("output.txt");
           free(text);
      }
 
      return 0;
+}
+
+int nameCheck(char *p)
+{
+	int i;
+	char *savedWords[] = {"mov", "cmp", "add", "sub", "lea", "bne", "jsr", "red", "prn", "rts", "stop"};
+	for (i = 0; savedWords[i]; i++)
+	{
+          if (!strncmp(p, savedWords[i], strlen(savedWords[i])))
+               return true;
+	}
+	
+	if (*p == 'r')
+	{
+		for (i = 0; i < NUM_OF_REG; i++)
+		{
+			if (atof(p+1) == i)
+				return true;
+		}
+	}
+	
+	return false;
 }
