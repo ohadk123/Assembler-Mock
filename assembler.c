@@ -24,8 +24,6 @@ int main(int argc, char *argv[])
           
           while (fgets(text[t], MAX_LINE, code));
 
-          printf("%d\n", nameCheck("mov"));
-
           remove("output.txt");
           free(text);
      }
