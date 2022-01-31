@@ -109,3 +109,20 @@ char *skipWhiteSpace(char *p)
 	for (i = 0; p[i] != 0 && (p[i] == ' ' || p[i] == '\t'); i++); /*Count how many white spaces are there*/
 	return p+i;
 }
+
+int nameCheck(char *p)
+{
+	int i;
+	char *savedWords[] = {"mov", "cmp", "add", "sub", "lea", "bne", "jsr", "red", "prn", "rts", "stop"};
+     
+	for (i = 0; i < sizeof(savedWords)/sizeof(char *); i++)
+          if (!strncmp(p, savedWords[i], strlen(savedWords[i])))
+               return true;
+	
+	if (*p == 'r')
+		for (i = 0; i < NUM_OF_REG; i++)
+			if (atof(p+1) == i)
+				return true;
+	
+	return false;
+}

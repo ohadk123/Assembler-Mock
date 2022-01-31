@@ -33,6 +33,3 @@ typedef struct word
 
 word memory[MEM_SIZE];
 char **text;
-
-void initialize(char **, int);
-int nameCheck(char *p);
