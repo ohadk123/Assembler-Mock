@@ -4,6 +4,7 @@
 *.ob
 *.ent
 *.ext
+Assembler
 
 # Prerequisites
 *.d
