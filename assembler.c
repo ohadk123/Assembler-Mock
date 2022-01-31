@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
           
           while (fgets(text[t], MAX_LINE, code))
                printf("%s", text[t]);
-          printf("\ni = %d\n", size);
+               
           remove("output.txt");
           free(text);
      }
