@@ -1,16 +1,16 @@
 #include "main.h"
 
-char macroNames[MAX_LINE][MAX_LINE]; /*Contains the names of the macros of the code*/
-char macroList[MAX_LINE][MAX_MACRO_SIZE]; /*Contains the contents of the macros of the code*/
-char *mPtr; /*A pointer used for strings in macro process*/
-FILE *output; /*A pointer to the file which the pre-assembler stage code will output to*/
+char macroNames[MAX_LINE][MAX_LINE];        /* Contains the names of the macros of the code                            */
+char macroList[MAX_LINE][MAX_MACRO_SIZE];   /* Contains the contents of the macros of the code                         */
+char *mPtr;                                 /* A pointer used for strings in macro process                             */
+FILE *output;                               /* A pointer to the file which the pre-assembler stage code will output to */
 
 /**
  * This is function is in charge of managing macros
  * and writing the code into a new file without comments,
  * and unfolded macros
  * @param fileName - The name of the file we want to open
- * @return - the number of lines in the new file
+ * @return - the number of lines in the new file or -1 if an error occurred.
  */
 int runMacro(char *fileName);
 
@@ -35,7 +35,7 @@ int unfoldMacro(int i, int m);
  * @param p - A pointer of the first char of the line string
  * @return - The pointer of the first char that is not a white space
  */
-char *skipWhiteSpace(char *);
+char *skipWhiteSpace(char *p);
 
 /**
  * This function when recieving a string checks if 

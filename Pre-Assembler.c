@@ -12,8 +12,8 @@ int runMacro(char *argv)
      FILE *fp = fopen(strcat(strcpy(fileName, argv), ".as"), "r");
      if (fp == NULL) 
      {
-          printf("\nError trying to open %s\n", fileName);
-          printf("The program will continue to the next file\n"); 
+          fprintf(stderr, "\nError trying to open %s\n", fileName);
+          fprintf(stderr, "The program will continue to the next file\n"); 
           return -1;
      }
      fseek(fp, 0, SEEK_SET);
@@ -37,8 +37,15 @@ int runMacro(char *argv)
           /*Start of macro decleration detected, starts macro reading process*/
 		if (!strncmp(p, "macro", 5))
 		{
-               readMacro(p, m, fp);
-               m++;
+               if (!nameCheck(p+6)) {
+                    readMacro(p, m, fp);
+                    m++;
+               }
+               else {
+                    fprintf(stderr, "Illegal macro name: %sin file %s\n", p+6, fileName);
+                    fprintf(stderr, "The program will continue to the next file\n");
+                    return -1;
+               }
                continue;
           }
           
