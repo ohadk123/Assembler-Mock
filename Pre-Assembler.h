@@ -1,4 +1,17 @@
-#include "main.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_LINE 81 /*Maximum allowed length of line*/
+#define MAX_MACRO_SIZE 6*MAX_LINE /*Maximum length allowed of macro*/
+#define MEM_SIZE 8192 /*Size of memory*/
+#define NUM_OF_REG 15 /*Amount of registers in cpu*/
+
+typedef enum boolean
+{
+	false = 0,
+	true = 1
+} bool;
 
 char macroNames[MAX_LINE][MAX_LINE];        /* Contains the names of the macros of the code                            */
 char macroList[MAX_LINE][MAX_MACRO_SIZE];   /* Contains the contents of the macros of the code                         */
