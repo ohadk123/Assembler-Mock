@@ -8,6 +8,9 @@ Assembler
 unmake
 unmake.c
 
+# vsCode folder
+.vscode
+
 # Prerequisites
 *.d
 
