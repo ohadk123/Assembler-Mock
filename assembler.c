@@ -3,8 +3,6 @@
 int main(int argc, char *argv[])
 {
      int arg;
-     char *line = "";
-     FILE *fp;
      if (argc <= 1)
      {
           printf("\nError argc\n");

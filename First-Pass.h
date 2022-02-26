@@ -1,3 +1,5 @@
+#include "Global.h"
+
 typedef union Word
 {
      struct
@@ -22,7 +24,7 @@ typedef union Word
           unsigned int o :1;
      } opcode;
 
-     unsigned short base :16;
-     unsigned short offset :16;
-     unsigned short number :16;
+     unsigned short base;
+     unsigned short offset;
+     unsigned short number;
 } Word;
