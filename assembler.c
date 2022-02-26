@@ -12,12 +12,9 @@ int main(int argc, char *argv[])
      for (arg = 1; arg < argc; arg++)
      {
           if (!preAssembler(argv[arg]))
-          {
                continue;
-          }
-          else
-          {
-          }
+          
+          
      }
 
      return 0;

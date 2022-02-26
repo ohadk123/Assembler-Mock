@@ -8,14 +8,14 @@ int preAssembler(char *fileName)
 
      /*Error occurred in macro function*/
      if ((size = runMacro(fileName)) == -1)
-          return 0;
+          return false;
 
      /*Allocating memory to text array*/
      text = (char **)malloc(size * (sizeof(char*)));
      for (t = 0; t < size; t++)
           text[t] = (char *)malloc(MAX_LINE * sizeof(char));
      t = 0;
-     return 1;
+     return true;
 }
 
 int runMacro(char *argv)
