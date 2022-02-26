@@ -17,7 +17,7 @@ char **preAssembler(char *fileName)
           *text = (char *)malloc(MAX_LINE * sizeof(char));
 
      /*Opens the Pre Assemblered code*/
-     code = fopen("output.txt", "r");
+     code = fopen("output.txt", "w");
      if (code == NULL)
      {
           printf("\nError occured trying to open file");
