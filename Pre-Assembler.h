@@ -4,8 +4,6 @@
 
 #define MAX_LINE 81					/*Maximum allowed length of line*/
 #define MAX_MACRO_SIZE 6 * MAX_LINE /*Maximum length allowed of macro*/
-#define MEM_SIZE 8192				/*Size of memory*/
-#define NUM_OF_REG 15				/*Amount of registers in cpu*/
 
 typedef enum boolean
 {
@@ -24,7 +22,7 @@ FILE *output;							  /* A pointer to the file which the pre-assembler stage cod
  * @param fileName - The name of the file as it was given in the terminal
  * @return - 0 if an error occures, the code in success
  */
-char **preAssembler(char *fileName);
+int preAssembler(char *fileName);
 
 /**
  * @brief
@@ -60,12 +58,3 @@ int unfoldMacro(int i, int m);
  * @return - The pointer of the first char that is not a white space
  */
 char *skipWhiteSpace(char *p);
-
-/**
- * @brief
- * This function when recieving a string checks if
- * the string is identical to the assembly's saved words
- * @param p - A pointer to the string we want to check
- * @return - 1 if it is identical to a saved word, otherwise 0
- */
-int nameCheck(char *p);

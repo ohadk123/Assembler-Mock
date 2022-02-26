@@ -1,8 +1,7 @@
 #include "Pre-Assembler.h"
 
-char **preAssembler(char *fileName)
+int preAssembler(char *fileName)
 {
-     FILE *code;    /*The file that contains the code*/
      char **text;   /*Saves the entire pre-assembled code*/
      int t;         /*For loops counter*/
      int size;      /*The amount of lines in the file*/
@@ -12,24 +11,11 @@ char **preAssembler(char *fileName)
           return 0;
 
      /*Allocating memory to text array*/
-     text = (char **)malloc(size * (sizeof(char *)));
+     text = (char **)malloc(size * (sizeof(char*)));
      for (t = 0; t < size; t++)
-          *text = (char *)malloc(MAX_LINE * sizeof(char));
-
-     /*Opens the Pre Assemblered code*/
-     code = fopen("output.txt", "w");
-     if (code == NULL)
-     {
-          printf("\nError occured trying to open file");
-          return 0;
-     }
-     fseek(code, 0, SEEK_SET);
-
-     /*Saves the code to array text*/
-     while (fgets(text[t], MAX_LINE, code));
-
-     remove("output.txt");
-     return text;
+          text[t] = (char *)malloc(MAX_LINE * sizeof(char));
+     t = 0;
+     return 1;
 }
 
 int runMacro(char *argv)
@@ -68,17 +54,8 @@ int runMacro(char *argv)
           /*Start of macro decleration detected, starts macro reading process*/
           if (!strncmp(p, "macro", 5))
           {
-               if (!nameCheck(p + 6))
-               {
-                    readMacro(p, m, fp);
-                    m++;
-               }
-               else
-               {
-                    fprintf(stderr, "Illegal macro name: %sin file %s\n", p + 6, fileName);
-                    fprintf(stderr, "The program will continue to the next file\n");
-                    return -1;
-               }
+               readMacro(p, m, fp);
+               m++;
                continue;
           }
 
@@ -99,7 +76,7 @@ int runMacro(char *argv)
                i++;
           }
      }
-
+     
      fclose(output);
      return i;
 }
@@ -149,21 +126,4 @@ char *skipWhiteSpace(char *p)
      for (i = 0; p[i] != 0 && (p[i] == ' ' || p[i] == '\t'); i++)
           ; /*Count how many white spaces are there*/
      return p + i;
-}
-
-int nameCheck(char *p)
-{
-     int i;
-     char *savedWords[] = {"mov", "cmp", "add", "sub", "lea", "bne", "jsr", "red", "prn", "rts", "stop"};
-
-     for (i = 0; i < sizeof(savedWords) / sizeof(char *); i++)
-          if (!strncmp(p, savedWords[i], strlen(savedWords[i])))
-               return true;
-
-     if (*p == 'r')
-          for (i = 0; i < NUM_OF_REG; i++)
-               if (atof(p + 1) == i)
-                    return true;
-
-     return false;
 }

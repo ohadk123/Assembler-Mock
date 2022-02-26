@@ -3,8 +3,8 @@
 int main(int argc, char *argv[])
 {
      int arg;
-     char **code;
-
+     char *line = "";
+     FILE *fp;
      if (argc <= 1)
      {
           printf("\nError argc\n");
@@ -13,14 +13,12 @@ int main(int argc, char *argv[])
 
      for (arg = 1; arg < argc; arg++)
      {
-          if (!(code = preAssembler(argv[arg])))
+          if (!preAssembler(argv[arg]))
           {
-               printf("Error");
                continue;
           }
           else
           {
-               printf("Success");
           }
      }
 
