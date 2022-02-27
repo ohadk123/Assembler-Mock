@@ -47,8 +47,8 @@ int runMacro(char *argv)
           p = line;
           p = skipWhiteSpace(p);
 
-          /*Comments need to be ignored*/
-          if (!strncmp(p, ";", 1))
+          /*Comments and blank lines should be ignored*/
+          if (!strncmp(p, ";", 1) || !strncmp(p, "\n", 1))
                continue;
 
           /*Start of macro decleration detected, starts macro reading process*/
