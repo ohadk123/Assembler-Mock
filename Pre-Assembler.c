@@ -30,7 +30,7 @@ int runMacro(char *argv)
      FILE *fp = fopen(strcat(strcpy(fileName, argv), ".as"), "r");
      if (fp == NULL)
      {
-          fprintf(stderr, "\nError trying to open %s\n", fileName);
+          fprintf(stderr, "Error trying to open %s\n", fileName);
           fprintf(stderr, "The program will continue to the next file\n");
           return -1;
      }
