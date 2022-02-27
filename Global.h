@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LINE 81					/*Maximum allowed length of line*/
+#define MAX_LINE 81				 /*Maximum allowed length of line*/
 #define MAX_MACRO_SIZE 6 * MAX_LINE /*Maximum length allowed of macro*/
 #define MEM_SIZE 8192               /*Virtual computer's memory size*/
 
@@ -11,6 +11,10 @@ typedef enum boolean
 	false = 0,
 	true = 1
 } bool;
+
+enum none {none = 0};
+enum location {code = 1, data = 2};
+enum type {entry = 1, external = 2};
 
 typedef union Word
 {
@@ -41,7 +45,23 @@ typedef union Word
      unsigned short number;
 } Word;
 
-Word memory[MEM_SIZE];
+typedef struct Symbol
+{
+     char *name;
+     int value;
+     int base;
+     int offset;
+     struct attribute
+     {
+          int location;
+          int type;
+     } attribute;
+     struct Symbol *next;
+} Symbol;
+
+static Symbol firstSymbol;
+static Word memory[MEM_SIZE];
+static int IC, DC;
 
 /*void printMemory()
 {
