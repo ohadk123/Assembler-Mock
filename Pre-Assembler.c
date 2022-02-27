@@ -120,10 +120,9 @@ int unfoldMacro(int i, int m)
      return i;
 }
 
-char *skipWhiteSpace(char *p)
+/*char *skipWhiteSpace(char *p)
 {
      int i;
-     for (i = 0; p[i] != 0 && (p[i] == ' ' || p[i] == '\t'); i++)
-          ; /*Count how many white spaces are there*/
+     for (i = 0; p[i] != 0 && (p[i] == ' ' || p[i] == '\t'); i++); Count how many white spaces are there
      return p + i;
-}
+}*/

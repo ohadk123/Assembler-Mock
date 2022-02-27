@@ -45,5 +45,5 @@ int unfoldMacro(int i, int m);
  * This function skips all white spaces in the start of the line
  * @param p - A pointer of the first char of the line string
  * @return - The pointer of the first char that is not a white space
- */
-char *skipWhiteSpace(char *p);
+ 
+char *skipWhiteSpace(char *p);*/
