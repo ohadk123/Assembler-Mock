@@ -6,7 +6,8 @@ int memLoc = 100;
 
 int firstPass()
 {
-    FILE *code;
+    bool errors = false;
+    FILE *text;
     char line[MAX_LINE];
     char *startP;
     char *endP;
@@ -15,16 +16,16 @@ int firstPass()
     bool symFlag = false;
     int i;
 
-    code = fopen("output.txt", "r");
-    if (code == NULL)
+    text = fopen("output.txt", "r");
+    if (text == NULL)
      {
           fprintf(stderr, "Error trying to open output file, stupid");
           fprintf(stderr, "The program will continue to the next file\n");
           return -1;
      }
-     fseek(code, 0, SEEK_SET);
+     fseek(text, 0, SEEK_SET);
     
-    while (fgets(line, MAX_LINE, code) != NULL)
+    while (fgets(line, MAX_LINE, text) != NULL)
     {
         tagName = (char *)calloc(1, sizeof(char));
         lineCount++;
@@ -42,6 +43,7 @@ int firstPass()
             if (!nameCheck(tagName))
             {
                 fprintf(stderr, "[%d] Illegal tag name: %s\n", lineCount, tagName);
+                errors = true;
                 continue;
             }
 
@@ -50,10 +52,17 @@ int firstPass()
         
         startP = skipWhiteSpace(startP);
         
-        if(isData(startP) && symFlag)
+
+        if(isData(startP))
         {
             if (symFlag)
             {
+                if (!tableSearch(&firstSym, tagName))
+                {
+                    fprintf(stderr, "[%d] Duplicate tag name: %s\n", lineCount, tagName);
+                    errors = true;
+                    continue;
+                }
                 symPointer->name = (char *)calloc(strlen(tagName), sizeof(char));
                 strcpy(symPointer->name, tagName);
                 symPointer->value = memLoc;
@@ -62,16 +71,86 @@ int firstPass()
                 symPointer->attribute.location = data;
                 symPointer->next = (Symbol *)malloc(sizeof(Symbol));
                 symPointer = symPointer->next;
-                memLoc++;
                 symFlag = false;
             }
-            (!strncmp(startP, ".data", 5)) ? (codeData(startP + 6)) : (codeData(startP + 9));
+            
+            if (!strncmp(startP, ".data", 5))
+            {
+                removeSpaces(startP);
+                codeData(startP + 5);
+            }
+            else
+            {
+                codeString(startP + 9);
+            }
             continue;
         }
-        memLoc++;
-        symFlag = false;
+
+        if (!strncmp(startP, ".entry", 6))
+            continue;
+        
+        if (!strncmp(startP, ".extern", 7))
+        {
+            tagName = (char *)malloc(sizeof(endP+2));
+            strcpy(tagName, endP+2);
+            if (tagName[strlen(tagName)-1] == '\n')
+                tagName[strlen(tagName)-1] = '\0';
+
+            if (!nameCheck(tagName))
+            {
+                fprintf(stderr, "[%d] Illegal tag name: %s\n", lineCount, tagName);
+                errors = true;
+                continue;
+            }
+
+            if (!tableSearch(&firstSym, tagName))
+            {
+                fprintf(stderr, "[%d] Duplicate tag name: %s\n", lineCount, tagName);
+                errors = true;
+                continue;
+            }
+
+            symPointer->name = (char *)calloc(strlen(tagName), sizeof(char));
+            strcpy(symPointer->name, tagName);
+            symPointer->value = 0;
+            symPointer->base = 0;
+            symPointer->offset = 0;
+            symPointer->attribute.type = external;
+            symPointer->next = (Symbol *)malloc(sizeof(Symbol));
+            symPointer = symPointer->next;
+            symFlag = false;
+            continue;
+        }
+        
+        if (symFlag)
+        {
+            if (!tableSearch(&firstSym, tagName))
+            {
+                fprintf(stderr, "[%d] Duplicate tag name: %s\n", lineCount, tagName);
+                errors = true;
+                continue;
+            }
+            symPointer->name = (char *)calloc(strlen(tagName), sizeof(char));
+            strcpy(symPointer->name, tagName);
+            symPointer->value = memLoc;
+            symPointer->base = memLoc/16;
+            symPointer->offset = memLoc%16;
+            symPointer->attribute.location = code;
+            symPointer->next = (Symbol *)malloc(sizeof(Symbol));
+            symPointer = symPointer->next;
+            symFlag = false;
+        }
+            
+        if (nameCheck(startP))
+        {
+            fprintf(stderr, "[%d] Operation name does not exist! %s\n", lineCount, startP);
+            errors = true;
+            continue;
+        }
+
+        analizeCodeLine(startP);
     }
-    /*
+    
     symPointer = &firstSym;
     printf("NAME:\tVALUE:\tBASE:\tOFFSET:\tATTRIBUTES:\n");
     while(symPointer->next != NULL)
@@ -80,10 +159,10 @@ int firstPass()
         getAttr(symPointer->attribute.location, symPointer->attribute.type);
         symPointer = symPointer->next;
     }
-    */
-    fclose(code);
     printMemory();
-    return 1;
+    
+    fclose(text);
+    return errors;
 }
 
 bool nameCheck(char *name)
@@ -91,10 +170,9 @@ bool nameCheck(char *name)
     char *names[] = {"mov", "cmp", "add", "sub", "lea", "clr", "not", "inc", "dec", "jmp", "bne", "jsr", "red", "prn", "rts", "stop",
     "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
     int i;
-    
     for (i = 0; names[i]; i++)
     {
-        if (strlen(name) == strlen(names[i]) && !strncmp(name, names[i], strlen(names[i])))
+        if (strlen(name) >= strlen(names[i]) && !strncmp(name, names[i], strlen(names[i])))
             return false;
     }
     return true;
@@ -116,53 +194,103 @@ char *skipWhiteSpace(char *p)
 
 void getAttr(int location, int type)
 {
-    char *attr = "";
-    switch(location)
+    bool comma = false;
+    switch (location)
     {
-        case(0) :
-            break;
-        case(1) :
-            attr = (char *)calloc(6, sizeof(char *));
-            strcat(attr, "code ,");
-            break;
-        case(2) :
-            attr = (char *)calloc(6, sizeof(char *));
-            strcat(attr, "data ,");
-            break;
+    case(0) :
+        break;
+    case(1) :
+        printf("code");
+        comma = true;
+        break;
+    case(2) :
+        printf("data");
+        comma = true;
+        break;
     }
-
-    switch(type)
+    
+    switch (type)
     {
-        case(0) :
-            break;
-        case(1) :
-            attr = (char *)malloc(sizeof(attr) + 5*sizeof(char *));
-            strcat(attr, "entry");
-            break;
-        case(2) :
-            attr = (char *)malloc(sizeof(attr) + 8*sizeof(char *));
-            strcat(attr, "external");
-            break;
+    case(0) :
+        break;
+    case(1) :
+        if (comma) printf(", ");
+        printf("entry");
+        break;
+    case(2) :
+        if (comma) printf(", ");
+        printf("extern");
+        break;
     }
-    printf("%s\n", attr);
+    printf("\n");
     return;
 }
 
-void codeData(char *p)
+void codeString(char *p)
 {
     while(*p)
     {
         if (*p == 34)
-        {
-            memory[memLoc].opcode.A = 1;
-            memLoc++;
-            return;
-        }
+            break;
         memory[memLoc].opcode.A = 1;
-        (isdigit(*p)) ? (memory[memLoc].number = (*p-'0')) : (memory[memLoc].number = *p);
+        memory[memLoc].number = *p;
         memLoc++;
+        DC++;
         p++;
     }
+    memory[memLoc].opcode.A = 1;
+    memory[memLoc].number = 0;
+    memLoc++;
+}
+
+void codeData(char *p)
+{
+    int num, i;
+    while (true)
+    {
+        num = atof(p);
+        memory[memLoc].opcode.A = 1;
+        memory[memLoc].number = num;
+        memLoc++;
+        DC++;
+        for (i = 0; p[i] != ',' && p[i] != '\n'; i++);
+        p += i;
+        switch (*p)
+        {
+        case(',') :
+            p++;
+            break;
+        case ('\n') :
+            return;
+        }
+    }
+}
+
+void removeSpaces(char *str)
+{
+    int i, j;
+     for (i = 0, j = 0; str[i]; i++)
+     {
+          if (str[i] != ' ')
+               str[j++] = str[i];
+     }
+     str[j] = '\0';
+}
+
+bool tableSearch(Symbol *symP, char *name)
+{
+    while (symP != NULL)
+    {
+        if (!strcmp(symP->name, name))
+            return false;
+        symP = symP->next;
+    }
+    return true;
+}
+
+void analizeCodeLine(char *line)
+{
+    
 }
 
 void printMemory()
@@ -171,7 +299,7 @@ void printMemory()
     for (i = 0; i < MEM_SIZE; i++)
     {
         if (memory[i].quarter.A != 0)
-            printf("%04d\tA%d-B%d-C%d-D%d-E%d\n", i, 
+            printf("%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
                 memory[i].quarter.A, memory[i].quarter.B, memory[i].quarter.C, memory[i].quarter.D, memory[i].quarter.E);
     }
 }
