@@ -4,7 +4,6 @@ Word memory[MEM_SIZE];
 int IC = IC_START, DC = DC_START;
 Symbol firstSym = {"", 0, 0, 0, {0, 0}, NULL};
 Symbol *symPointer = &firstSym;
-int memLoc = IC_START;
 int lineCount = 0;
 bool errors = false;
 Instruction instructions[] = {{"mov", 0.0, 0, 2}, {"cmp", 1.0, 0, 2}, {"add", 2.0, 10, 2}, {"sub", 2.0, 11, 2}, {"lea", 4.0, 0, 2},
@@ -71,9 +70,9 @@ int firstPass()
             {
                 symPointer->name = (char *)malloc(sizeof(tagName));
                 strcpy(symPointer->name, tagName);
-                symPointer->value = memLoc;
-                symPointer->base = memLoc/16;
-                symPointer->offset = memLoc%16;
+                symPointer->value = IC;
+                symPointer->base = (IC/16)*16;
+                symPointer->offset = IC%16;
                 symPointer->attribute.location = data;
                 symPointer->next = (Symbol *)malloc(sizeof(Symbol));
                 symPointer = symPointer->next;
@@ -122,9 +121,9 @@ int firstPass()
         {
         	symPointer->name = (char *)malloc(sizeof(tagName));
             strcpy(symPointer->name, tagName);
-            symPointer->value = memLoc;
-            symPointer->base = memLoc/16;
-            symPointer->offset = memLoc%16;
+            symPointer->value = IC;
+            symPointer->base = (IC/16)*16;
+            symPointer->offset = IC%16;
             symPointer->attribute.location = code;
             symPointer->next = (Symbol *)malloc(sizeof(Symbol));
             symPointer = symPointer->next;
@@ -217,15 +216,15 @@ void codeString(char *p)
     {
         if (*p == 34)
             break;
-        memory[memLoc].opcode.A = 1;
-        memory[memLoc].number = *p;
-        memLoc++;
+        memory[IC].opcode.A = 1;
+        memory[IC].number = *p;
+        IC++;
         DC++;
         p++;
     }
-    memory[memLoc].opcode.A = 1;
-    memory[memLoc].number = 0;
-    memLoc++;
+    memory[IC].opcode.A = 1;
+    memory[IC].number = 0;
+    IC++;
 }
 
 void codeData(char *p)
@@ -234,9 +233,9 @@ void codeData(char *p)
     while (true)
     {
         num = atof(p);
-        memory[memLoc].opcode.A = 1;
-        memory[memLoc].number = num;
-        memLoc++;
+        memory[IC].opcode.A = 1;
+        memory[IC].number = num;
+        IC++;
         DC++;
         for (i = 0; p[i] != ',' && p[i] != '\n'; i++);
         p += i;
