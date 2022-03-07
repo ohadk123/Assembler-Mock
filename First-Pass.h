@@ -29,9 +29,7 @@ void codeString(char *p);
 void codeData(char *p);
 void removeSpaces(char *str);
 bool tableSearch(char *name);
-void analizeCode(char *codeLine);
-int codeTwoOp(char *codeLine, int instruction);
-int codeOneOp(char *codeLine, int instruction);
+int analizeCode(char *codeLine);
 void printMemory();
 
 #endif

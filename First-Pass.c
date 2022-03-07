@@ -131,7 +131,7 @@ int firstPass()
             symFlag = false;
         }
         
-        analizeCode(startP);
+        IC += analizeCode(startP);
     }
 
     free(tagName);
@@ -286,22 +286,21 @@ int analizeCode(char *codeLine)
     {
         if (strlen(codeLine) >= strlen(instructions[i].name) && !strncmp(codeLine, instructions[i].name, strlen(instructions[i].name)))
         {
-            for (j = 0; codeLine[j] != ' ' && codeLine[j] != '\t' && codeLine[j] != '\n'; j++);
+            for (j = 0; codeLine[j] != ' ' && codeLine[j] != '\t' && codeLine[j] != '\n'; j++); /* Skips instruction */
             codeLine = skipWhiteSpaces(codeLine+j);
-            memory[memLoc].number = (int) pow(2.0, instructions[i].opcode);
-            memory[memLoc].opcode.A = 1;  
-            memLoc++;
-            memory[memLoc].opcode.funct = instructions[i].funct;
+            codeLine[strlen(codeLine)-1] = '\0';
+            firstOp = strtok(codeLine, ct); /* First operand */
+            secondOp = strtok(NULL, ct); /* Second operand */
 
-            firstOp = strtok(codeLine, ct);
-            secondOp = strtok(NULL, ct);
-            if (strtok(NULL, ct) != NULL)
+            /* There never is a third operand, error if there is */
+            if (strtok(NULL, ct) != NULL) 
             {
-                printf("[%d] Too many operands!", lineCount);
+                printf("[%d] Too many operands!\n", lineCount);
                 errors = true;
                 return -1;
             }
 
+            /* If no operands needed, first operand should be just new line '\n' */
             if (instructions[i].numOfOps == 0)
             {
                 if (firstOp != NULL)
@@ -312,7 +311,10 @@ int analizeCode(char *codeLine)
                 }
                     return L;
             }
+            
+            L++; /* Funct word */
 
+            /* If only one operand needed, error occures if even second operand exists */
             if (instructions[i].numOfOps == 1)
             {
                 if (secondOp != NULL)
@@ -323,59 +325,102 @@ int analizeCode(char *codeLine)
                 }
             }
 
-            /* First operand is a number */
+            /* Identifying first Operand */
+            /* Checks for immediate addressing mode */
             if (*firstOp == '#')
             {
                 for ((firstOp[j] == '-' ? (j = 2) : (j = 1)); j < strlen(firstOp); j++)
                 {
                     if (!isdigit(firstOp[j]))
                     {
-                        printf("[%d] A number must follow up a # prefix!\n");
+                        printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
                         errors = true;
                         return -1;
                     }
                 }
-
-                number = atoi(firstOp+1);
-                memory[memLoc].opcode.origMode = 0;
-                memory[memLoc+1].opcode.A = 1;
-                memory[memLoc+1].number = number;
                 L++;
             }
-            /* Check if first operand is a register or a tag */
-            else if (*firstOp == 'r')
+            else if (*firstOp == 'r') /* Check if first operand is a register or a tag */
             {
                 for (j = 1; j < strlen(firstOp); j++)
                 {
                     if (!isdigit(firstOp[j]))
-                        L += 2;
+                    {
                         isTag = true;
                         break;
+                    }
                 }
                 if (!isTag)
                 {
                     number = atoi(firstOp+1);
-                    if (number >= 0 && number <= 15)
-                    {
-                        memory[memLoc].opcode.origReg = number;
-                        memory[memLoc].opcode.origMode = 3;
-                    }
-                    else
+                    if (number > 15)
                         isTag = true;
                 }
             }
-            /* Other operands can be tags */
-            else
+            else /* If not a register of immidiate addressing, it's a form of tag addressing */
                 isTag = true;
-
+            
+            /* Both tag addressing needs 2 words */
             if (isTag)
-            {
-                /* Check for index mode */
-                for (j = 0; j < strlen(firstOp()))
+                L += 2;
+
+            /* If only one operand needed we are done here */
+            if (instructions[i].numOfOps == 1)
+                return L;
+            
+
+            /* Identifying second operand word count */
+            isTag = false;
+            secondOp = skipWhiteSpaces(secondOp);
+
+            /* Checks for immediate addressing mode */
+            if (*secondOp == '#')
+            {   
+                for ((secondOp[j] == '-') ? (j = 1) : (j = 2); j < strlen(secondOp); j++)
+                {
+                    if (!isdigit(secondOp[j]))
+                    {
+                        printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
+                        errors = true;
+                        return -1;
+                    }
+                }
+                L++;
             }
+            else if (*secondOp == 'r')
+            {
+                for (j = 1; j < strlen(secondOp); j++)
+                {
+                    if (!isdigit(secondOp[j]))
+                    {
+                        isTag = true;
+                        break;
+                    }
+                }
+                if (!isTag)
+                {
+                    number = atoi(secondOp+1);
+                    if (number > 15)
+                    {
+                        isTag = true;
+                    }
+                }
+            }
+            else /* If not a register of immidiate addressing, it's a form of tag addressing */
+            {
+                isTag = true;
+            }
+            
+            /* Both tag addressing needs 2 words */
+            if (isTag)
+                L += 2;
+            
+            return L;
         }
     }
-	return;
+	printf("[%d] Unknown intsruction!", lineCount);
+    errors = true;
+    return -1;
 }
 
 void printMemory()
