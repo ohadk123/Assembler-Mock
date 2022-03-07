@@ -7,6 +7,7 @@ Symbol *symPointer = &firstSym;
 int memLoc = IC_START;
 int lineCount = 0;
 bool errors = false;
+int L;
 Instruction instructions[] = {{"mov", 0.0, 0, 2}, {"cmp", 1.0, 0, 2}, {"add", 2.0, 10, 2}, {"sub", 2.0, 11, 2}, {"lea", 4.0, 0, 2},
                               {"clr", 5.0, 10, 1},{"not", 5.0, 11, 1}, {"inc", 5.0, 12,1 }, {"dec", 5.0, 13, 1}, {"jmp", 9.0, 10, 1}, 
                               {"bne", 9.0, 11, 1}, {"jsr", 9.0, 12, 1}, {"red", 12.0, 0, 1}, {"prn", 13.0, 0, 1},
@@ -131,7 +132,9 @@ int firstPass()
             symFlag = false;
         }
         
-        IC += analizeCode(startP);
+        L = analizeCode(startP);
+        IC += L;
+        memLoc += L;
     }
 
     free(tagName);
@@ -226,6 +229,7 @@ void codeString(char *p)
     memory[memLoc].opcode.A = 1;
     memory[memLoc].number = 0;
     memLoc++;
+    DC++;
 }
 
 void codeData(char *p)
@@ -427,6 +431,7 @@ void printMemory()
 {
     int i;
     symPointer = &firstSym;
+    printf("ICF = %d, DCF = %d\n", IC, DC);
     printf("NAME:\tVALUE:\tBASE:\tOFFSET:\tATTRIBUTES:\n");
     while(symPointer->next != NULL)
     {
