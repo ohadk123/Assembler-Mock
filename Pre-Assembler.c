@@ -28,8 +28,8 @@ int runMacro(char *argv)
      FILE *fp = fopen(strcat(strcpy(fileName, argv), ".as"), "r");
      if (fp == NULL)
      {
-          fprintf(stderr, "Error trying to open %s\n", fileName);
-          fprintf(stderr, "The program will continue to the next file\n");
+          printf("Error trying to open %s\n", fileName);
+          printf("The program will continue to the next file\n");
           return -1;
      }
      fseek(fp, 0, SEEK_SET);
@@ -48,7 +48,7 @@ int runMacro(char *argv)
           /*Comments and blank lines should be ignored*/
           if (!strncmp(p, ";", 1) || !strncmp(p, "\n", 1))
           {
-               fprintf(output, "\n");
+               fprintf(output, "%d\n", i+1);
                i++;
                continue;
           }
@@ -74,7 +74,7 @@ int runMacro(char *argv)
           /*printLine is false when the line is a macro name*/
           if (printLine)
           {
-               fprintf(output, "%s", p);
+               fprintf(output, "%d %s", i+1, p);
                i++;
           }
      }
