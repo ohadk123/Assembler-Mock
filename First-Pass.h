@@ -20,7 +20,7 @@
                 continue; \
             }
 
-int firstPass();
+bool firstPass();
 bool nameCheck(char *name);
 bool isData(char *p);
 char *skipWhiteSpaces(char *p);

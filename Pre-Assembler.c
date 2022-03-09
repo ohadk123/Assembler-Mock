@@ -5,24 +5,13 @@ char macroList[MAX_LINE][MAX_MACRO_SIZE]; /* Contains the contents of the macros
 char *mPtr;						  /* A pointer used for strings in macro process                             */
 FILE *output;					       /* A pointer to the file which the pre-assembler stage code will output to */
 
-int preAssembler(char *fileName)
+bool preAssembler(char *argv)
 {
-     int size;      /*The amount of lines in the file*/
-
-     /*Error occurred in macro function*/
-     if ((size = runMacro(fileName)) == -1)
-          return false;
-
-     return true;
-}
-
-int runMacro(char *argv)
-{
-     char *fileName = (char *)malloc(sizeof(argv)); /*String of the name file in a different location from argv*/
-     char line[MAX_LINE];                           /*String of the current line*/
-     char *p = line;                                /*A pointer to the string "line"*/
-     int i = 0, j, m = 0;                           /*Counters*/
-     bool printLine;                                /*Used to skip a line in output process*/
+     char *fileName = (char *)malloc(sizeof(argv)); /* String of the name file in a different location from argv */
+     char line[MAX_LINE];                           /* String of the current line                                */
+     char *p = line;                                /* A pointer to the string "line"                            */
+     int i = 1, j, m = 0;                           /* Counters                                                  */
+     bool printLine;                                /* Used to skip a line in output process                     */
 
      /*Opens the file, in case of error returns -1*/
      FILE *fp = fopen(strcat(strcpy(fileName, argv), ".as"), "r");
@@ -30,7 +19,7 @@ int runMacro(char *argv)
      {
           printf("Error trying to open %s\n", fileName);
           printf("The program will continue to the next file\n");
-          return -1;
+          return false;
      }
      fseek(fp, 0, SEEK_SET);
 
@@ -48,7 +37,7 @@ int runMacro(char *argv)
           /*Comments and blank lines should be ignored*/
           if (!strncmp(p, ";", 1) || !strncmp(p, "\n", 1))
           {
-               fprintf(output, "%d\n", i+1);
+               fprintf(output, "%d\n", i);
                i++;
                continue;
           }
@@ -56,7 +45,7 @@ int runMacro(char *argv)
           /*Start of macro decleration detected, starts macro reading process*/
           if (!strncmp(p, "macro", 5))
           {
-               readMacro(p, m, fp);
+               i += readMacro(p, m, fp);
                m++;
                continue;
           }
@@ -66,7 +55,8 @@ int runMacro(char *argv)
           {
                if (!strncmp(p, macroNames[j], strlen(macroNames[j])))
                {
-                    (i = unfoldMacro(i, j));
+                    unfoldMacro(j);
+                    i++;
                     printLine = false;
                }
           }
@@ -74,7 +64,7 @@ int runMacro(char *argv)
           /*printLine is false when the line is a macro name*/
           if (printLine)
           {
-               fprintf(output, "%d %s", i+1, p);
+               fprintf(output, "%d %s", i, p);
                i++;
           }
      }
@@ -82,13 +72,13 @@ int runMacro(char *argv)
      free(fileName);
      fclose(fp);
      fclose(output);
-     return i;
+     return true;
 }
 
-void readMacro(char p[], int m, FILE *fp)
+int readMacro(char p[], int m, FILE *fp)
 {
      char *line; /* Pointer to current line being processed*/
-
+     int i = 1;
      strcpy(macroNames[m], p + 6); /*Saves the name of the macro*/
      mPtr = macroList[m];          /*Points mPtr to the macro contents array*/
 
@@ -96,6 +86,7 @@ void readMacro(char p[], int m, FILE *fp)
      {
           fgets(line, MAX_LINE, fp);
           line = skipWhiteSpace(line);
+          i++;
 
           /*endm reached, macro ended*/
           if (!strncmp(line, "endm", 4))
@@ -107,23 +98,15 @@ void readMacro(char p[], int m, FILE *fp)
           }
      }
      
-     return;
+     return i++;
 }
 
-int unfoldMacro(int i, int m)
+void unfoldMacro(int m)
 {
-     /*char *toPrint = (char *)malloc(MAX_MACRO_SIZE*sizeof(char));*/ /*The string to print as the macro*/
-     int j;
      mPtr = macroList[m]; /*Points mPtr to the macro definition*/
 
-     /*counts how many lines is the macro*/
-     for (j = 0; *mPtr != '\0'; mPtr++, j++)
-     {
-          if (*mPtr == '\n')
-               i++;
-     }
      fprintf(output, "%s", macroList[m]); /*Outputs the macro*/
-     return i;
+     return;
 }
 
 char *skipWhiteSpace(char *p)

@@ -3,11 +3,9 @@
 
 #include "Global.h"
 
-int preAssembler(char *fileName);
-int runMacro(char *argv);
-void readMacro(char p[], int m, FILE *fp);
-int unfoldMacro(int i, int m);
+bool preAssembler(char *argv);
+int readMacro(char p[], int m, FILE *fp);
+void unfoldMacro(int m);
 char *skipWhiteSpace(char *p);
-#define SKIP_WHITE
 
 #endif

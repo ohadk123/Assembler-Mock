@@ -24,7 +24,7 @@ Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true}, 
                               {"rts", 14.0, 0, 0,  {false, false, false, false}, {false, false, false, false}},
                               {"stop", 15.0, 0, 0, {false, false, false, false}, {false, false, false, false}}};
 
-int firstPass()
+bool firstPass()
 {
     FILE *text;
     char line[MAX_LINE];
@@ -39,25 +39,34 @@ int firstPass()
     text = fopen("output.txt", "r");
     if (text == NULL)
      {
-          fprintf(stderr, "Error trying to open output file, stupid");
-          fprintf(stderr, "The program will continue to the next file\n");
-          return -1;
+          printf("Error in pre-Assembler runtime\n");
+          printf("The program will continue to the next file\n");
+          return false;
      }
      fseek(text, 0, SEEK_SET);
     }
 
     while (fgets(line, MAX_LINE, text) != NULL)
     {
-        if (!strcmp(line, "\n"))
-        {
-            lineCount++;
-            continue;
-        }
+
         tagName = " ";
-        lineCount++;
         startP = line;
         endP = line;
         symFlag = false;
+
+        if (isdigit(*startP))
+        {
+            lineCount = atoi(startP);
+            while (*startP != ' ' && *startP != '\n')
+                startP++;
+            if (*startP == ' ')
+                startP++;
+            endP = startP;
+        }
+
+        if (!strcmp(startP, "\n") || strlen(startP) == 0)
+            continue;
+
 
         while (endP[1] != ' ')
             endP++;
@@ -67,8 +76,8 @@ int firstPass()
         {
             symFlag = true;
             tagName = (char *)calloc((endP-startP), sizeof(char));
-            for (i = 0; line[i] != ':'; i++)
-                tagName[i] = line[i];
+            for (i = 0; startP[i] != ':'; i++)
+                tagName[i] = startP[i];
             
             CHECK_TAG_NAME
 
@@ -360,7 +369,7 @@ int analizeCode(char *codeLine)
         }
     }
     /* Looped through entire instruction list and not found a correct instruction */
-	printf("[%d] Unknown intsruction!", lineCount);
+	printf("[%d] Unknown intsruction! %s\n", lineCount, codeLine);
     return 0;
 }
 
