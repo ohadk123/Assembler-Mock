@@ -446,6 +446,5 @@ void printMemory()
             printf("%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
                 memory[i].quarter.A, memory[i].quarter.B, memory[i].quarter.C, memory[i].quarter.D, memory[i].quarter.E);
     }
-    
     return;
 }
