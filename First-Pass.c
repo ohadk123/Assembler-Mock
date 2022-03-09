@@ -6,12 +6,23 @@ Symbol firstSym = {"", 0, 0, 0, {0, 0}, NULL};
 Symbol *symPointer = &firstSym;
 int memLoc = IC_START;
 int lineCount = 0;
-bool errors = false;
-int L;
-Instruction instructions[] = {{"mov", 0.0, 0, 2}, {"cmp", 1.0, 0, 2}, {"add", 2.0, 10, 2}, {"sub", 2.0, 11, 2}, {"lea", 4.0, 0, 2},
-                              {"clr", 5.0, 10, 1},{"not", 5.0, 11, 1}, {"inc", 5.0, 12,1 }, {"dec", 5.0, 13, 1}, {"jmp", 9.0, 10, 1}, 
-                              {"bne", 9.0, 11, 1}, {"jsr", 9.0, 12, 1}, {"red", 12.0, 0, 1}, {"prn", 13.0, 0, 1},
-                              {"rts", 14.0, 0, 0}, {"stop", 15.0, 0, 0}};
+int L;                                          /* {immid, direc, index, reg}    {immid, direc, index, reg} */
+Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true},  {false, true,  true,  true}}, 
+                              {"cmp", 1.0, 0, 2,   {true,  true,  true,  true},  {true,  true,  true,  true}},
+                              {"add", 2.0, 10, 2,  {true,  true,  true,  true},  {false, true,  true,  true}},
+                              {"sub", 2.0, 11, 2,  {true,  true,  true,  true},  {false, true,  true,  true}},
+                              {"lea", 4.0, 0, 2,   {false, true,  true,  false}, {false, true,  true,  true}},
+                              {"clr", 5.0, 10, 1,  {false, false, false, false}, {false, true,  true,  true}},
+                              {"not", 5.0, 11, 1,  {false, false, false, false}, {false, true,  true,  true}},
+                              {"inc", 5.0, 12,1 ,  {false, false, false, false}, {false, true,  true,  true}},
+                              {"dec", 5.0, 13, 1,  {false, false, false, false}, {false, true,  true,  true}},
+                              {"jmp", 9.0, 10, 1,  {false, false, false, false}, {false, true,  true,  false}}, 
+                              {"bne", 9.0, 11, 1,  {false, false, false, false}, {false, true,  true,  false}},
+                              {"jsr", 9.0, 12, 1,  {false, false, false, false}, {false, true,  true,  false}},
+                              {"red", 12.0, 0, 1,  {false, false, false, false}, {false, true,  true,  true}},
+                              {"prn", 13.0, 0, 1,  {false, false, false, false}, {true,  true,  true,  true}},
+                              {"rts", 14.0, 0, 0,  {false, false, false, false}, {false, false, false, false}},
+                              {"stop", 15.0, 0, 0, {false, false, false, false}, {false, false, false, false}}};
 
 int firstPass()
 {
@@ -22,6 +33,7 @@ int firstPass()
     char *tagName = (char *)malloc(sizeof(char *));
     bool symFlag = false;
     int i;
+    bool errors = false;
 
     /* Opening the processed code */ {
     text = fopen("output.txt", "r");
@@ -133,6 +145,8 @@ int firstPass()
         }
         
         L = analizeCode(startP);
+        if (L == 0)
+            errors = true;
         IC += L;
         memLoc += L;
     }
@@ -283,16 +297,18 @@ int analizeCode(char *codeLine)
     int size = sizeof(instructions)/sizeof(Instruction);
     char *firstOp, *secondOp;
     char ct[2] = ",";
-	int i, j, number, L = 1;
-    bool isTag = false;
+	int i, j, L = 1, l;
+    Instruction *instruct;
+    direction dir;
 	
     for (i = 0; i < size; i++)
     {
-        if (strlen(codeLine) >= strlen(instructions[i].name) && !strncmp(codeLine, instructions[i].name, strlen(instructions[i].name)))
+        instruct = instructions + i;
+        if (strlen(codeLine) >= strlen(instruct->name) && !strncmp(codeLine, instruct->name, strlen(instruct->name)))
         {
             for (j = 0; codeLine[j] != ' ' && codeLine[j] != '\t' && codeLine[j] != '\n'; j++); /* Skips instruction */
-            codeLine = skipWhiteSpaces(codeLine+j);
-            codeLine[strlen(codeLine)-1] = '\0';
+            codeLine = skipWhiteSpaces(codeLine+j); /* Ignoring white space after instruction */
+            codeLine[strlen(codeLine)-1] = '\0'; /* Removing \n from the end for convenience */
             firstOp = strtok(codeLine, ct); /* First operand */
             secondOp = strtok(NULL, ct); /* Second operand */
 
@@ -300,130 +316,115 @@ int analizeCode(char *codeLine)
             if (strtok(NULL, ct) != NULL) 
             {
                 printf("[%d] Too many operands!\n", lineCount);
-                errors = true;
-                return -1;
+                return 0;
             }
 
-            /* If no operands needed, first operand should be just new line '\n' */
-            if (instructions[i].numOfOps == 0)
+            /* If no operands needed, error if first operand exists
+             * Zero operand instructions use only 1 word */
+            if (instruct->numOfOps == 0)
             {
                 if (firstOp != NULL)
                 {
                     printf("[%d] Extraneous text after instruction!\n", lineCount);
-                    errors = true;
-                    return -1;
+                    return 0;
                 }
                     return L;
             }
             
-            L++; /* Funct word */
+            L++; /*Funct word */
 
             /* If only one operand needed, error occures if even second operand exists */
-            if (instructions[i].numOfOps == 1)
+            if (instruct->numOfOps == 1 && secondOp != NULL)
             {
-                if (secondOp != NULL)
-                {
-                    printf("[%d] Too many operands!\n", lineCount);
-                    errors = true;
-                    return -1;
-                }
+                printf("[%d] Too many operands!\n", lineCount);
+                return 0;
             }
 
-            /* Identifying first Operand */
-            /* Checks for immediate addressing mode */
-            if (*firstOp == '#')
-            {
-                for ((firstOp[j] == '-' ? (j = 2) : (j = 1)); j < strlen(firstOp); j++)
-                {
-                    if (!isdigit(firstOp[j]))
-                    {
-                        printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
-                        errors = true;
-                        return -1;
-                    }
-                }
-                L++;
-            }
-            else if (*firstOp == 'r') /* Check if first operand is a register or a tag */
-            {
-                for (j = 1; j < strlen(firstOp); j++)
-                {
-                    if (!isdigit(firstOp[j]))
-                    {
-                        isTag = true;
-                        break;
-                    }
-                }
-                if (!isTag)
-                {
-                    number = atoi(firstOp+1);
-                    if (number > 15)
-                        isTag = true;
-                }
-            }
-            else /* If not a register of immidiate addressing, it's a form of tag addressing */
-                isTag = true;
-            
-            /* Both tag addressing needs 2 words */
-            if (isTag)
-                L += 2;
+            dir = instruct->numOfOps == 1 ? destination : origin;
 
-            /* If only one operand needed we are done here */
-            if (instructions[i].numOfOps == 1)
+            l = identifyAddressingMode(firstOp, *instruct, dir ? instruct->destModes : instruct->origModes, dir);
+            if (l == -1)
+                return 0;
+            L += l;
+            if (instruct->numOfOps == 1) /* If only one operand needed we are done here */
                 return L;
-            
 
-            /* Identifying second operand word count */
-            isTag = false;
             secondOp = skipWhiteSpaces(secondOp);
-
-            /* Checks for immediate addressing mode */
-            if (*secondOp == '#')
-            {   
-                for ((secondOp[j] == '-') ? (j = 1) : (j = 2); j < strlen(secondOp); j++)
-                {
-                    if (!isdigit(secondOp[j]))
-                    {
-                        printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
-                        errors = true;
-                        return -1;
-                    }
-                }
-                L++;
-            }
-            else if (*secondOp == 'r')
-            {
-                for (j = 1; j < strlen(secondOp); j++)
-                {
-                    if (!isdigit(secondOp[j]))
-                    {
-                        isTag = true;
-                        break;
-                    }
-                }
-                if (!isTag)
-                {
-                    number = atoi(secondOp+1);
-                    if (number > 15)
-                    {
-                        isTag = true;
-                    }
-                }
-            }
-            else /* If not a register of immidiate addressing, it's a form of tag addressing */
-            {
-                isTag = true;
-            }
-            
-            /* Both tag addressing needs 2 words */
-            if (isTag)
-                L += 2;
+            l = identifyAddressingMode(secondOp, *instruct, instruct->destModes, destination);
+            if (l == -1)
+                return 0;
+            L+= l;
             
             return L;
         }
     }
+    /* Looped through entire instruction list and not found a correct instruction */
 	printf("[%d] Unknown intsruction!", lineCount);
-    errors = true;
+    return 0;
+}
+
+int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, direction dir)
+{
+    #define DIRECTION(dir) dir ? "destination" : "origin"
+    int j = 0;
+    bool isTag = false;
+    int number;
+
+    /* Checks for immediate addressing mode
+     * checks if it's actually a number, skips '-' if it exists
+     * Error if there is a char which is not a digit
+     * Immidiate addressing mode uses only 1 word */
+    if (*operand == '#')
+    {   
+        for ((operand[j] == '-') ? (j = 1) : (j = 2); j < strlen(operand); j++)
+        {
+            if (!isdigit(operand[j]))
+            {
+                printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
+                return -1;
+            }
+        }
+        if (modes[immediate])
+            return 1;
+        printf("[%d] instruction doesnt support immidiate addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+        return -1;
+    }
+    /* Check if operand is a register or a tag
+     * Register name is only a whole number, might be a tag if a char is not a digit
+     * Error if the char is not a letter as well
+     * If all characters are digits, it might be a register or a tag 
+     * Register names are in range 0-15, else might be a tag */
+    else if (*operand == 'r')
+    {
+        for (j = 1; j < strlen(operand); j++)
+        {
+            if (!isdigit(operand[j]))
+            {
+                if (!isalpha(operand[j]))
+                {
+                    printf("[%d] Illegal character in tag name!", lineCount);
+                    return -1;
+                }
+                isTag = true;
+            }
+        }
+        if (!isTag)
+        {
+            number = atoi(operand+1);
+            if (number > 15)
+                isTag = true;
+            else
+            {
+                if (modes[regDirect])
+                    return 0;
+                printf("[%d] instruction doesnt support register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+                return -1;
+            }
+        }
+    }
+    if (modes[direct])
+        return 2;
+    printf("[%d] instruction doesnt support tag type addressing mode for %s operand\n", lineCount, DIRECTION(dir));
     return -1;
 }
 

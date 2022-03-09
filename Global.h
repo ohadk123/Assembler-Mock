@@ -64,7 +64,8 @@ typedef struct Symbol
      struct Symbol *next;
 } Symbol;
 
-enum addressingModes {immediate, direct, index, regDirect, noMode};
+enum addressingModes {immediate, direct, index, regDirect};
+typedef enum direction {origin, destination} direction;
 
 typedef struct Instruction
 {
@@ -72,6 +73,9 @@ typedef struct Instruction
      double opcode;
      int funct;
      int numOfOps;
+     /* {immidiate, direct, index, regDirect} */
+     bool origModes[4];
+     bool destModes[4];
 } Instruction;
 
 #endif

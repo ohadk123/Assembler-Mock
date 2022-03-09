@@ -30,6 +30,7 @@ void codeData(char *p);
 void removeSpaces(char *str);
 bool tableSearch(char *name);
 int analizeCode(char *codeLine);
+int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, direction dir);
 void printMemory();
 
 #endif
