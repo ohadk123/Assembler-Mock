@@ -9,13 +9,13 @@
 #define CHECK_TAG_NAME \
             if (!nameCheck(tagName)) \
             { \
-                printf("Illegal tag name: \"%s\"\n", tagName); \
+                printf("[%d] Illegal tag name: \"%s\"\n", lineCount, tagName); \
                 errors = true; \
                 continue; \
             } \
             if (!tableSearch(tagName)) \
             { \
-                printf("Duplicate tag name: %s\n",tagName); \
+                printf("[%d] Duplicate tag name: %s\n", lineCount, tagName); \
                 errors = true; \
                 continue; \
             }

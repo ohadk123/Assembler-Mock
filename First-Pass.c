@@ -90,6 +90,7 @@ int firstPass()
                 symPointer->attribute.location = data;
                 symPointer->next = (Symbol *)malloc(sizeof(Symbol));
                 symPointer = symPointer->next;
+                symPointer->name = "";
                 symFlag = false;
             }
 
@@ -127,6 +128,7 @@ int firstPass()
             symPointer->attribute.type = external;
             symPointer->next = (Symbol *)malloc(sizeof(Symbol));
             symPointer = symPointer->next;
+            symPointer->name = "";
             symFlag = false;
             continue;
         }
