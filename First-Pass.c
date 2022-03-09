@@ -70,7 +70,7 @@ int firstPass()
             for (i = 0; line[i] != ':'; i++)
                 tagName[i] = line[i];
             
-            /*CHECK_NAME(tagName)*/
+            CHECK_TAG_NAME
 
             startP = ++endP;
         }
@@ -117,7 +117,7 @@ int firstPass()
             if (tagName[strlen(tagName)-1] == '\n')
                 tagName[strlen(tagName)-1] = '\0';
             
-            /*CHECK_NAME(tagName)*/
+            CHECK_TAG_NAME
 
             symPointer->name = (char *)malloc(sizeof(tagName));
             strcpy(symPointer->name, tagName);
@@ -162,12 +162,11 @@ bool nameCheck(char *name)
     char *names[] = {"mov", "cmp", "add", "sub", "lea", "clr", "not", "inc", "dec", "jmp", "bne", "jsr", "red", "prn", "rts", "stop",
     "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
     int i;
-    for (i = 0; names[i]; i++)
+    for (i = 0; i < sizeof(names)/sizeof(char *); i++)
     {
         if (strlen(name) >= strlen(names[i]) && !strcmp(name, names[i]))
             return false;
     }
-
     if (!isalpha(*name))
         return false;
 
@@ -283,7 +282,7 @@ void removeSpaces(char *str)
 bool tableSearch(char *name)
 {
     Symbol *symP = &firstSym;
-    while (symP->next != NULL)
+    while (symP != symPointer)
     {
         if (!strcmp(symP->name, name))
             return false;

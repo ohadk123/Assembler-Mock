@@ -87,7 +87,7 @@ int runMacro(char *argv)
 
 void readMacro(char p[], int m, FILE *fp)
 {
-     char *line = (char *)malloc(MAX_LINE * sizeof(char)); /* Pointer to current line being processed*/
+     char *line; /* Pointer to current line being processed*/
 
      strcpy(macroNames[m], p + 6); /*Saves the name of the macro*/
      mPtr = macroList[m];          /*Points mPtr to the macro contents array*/

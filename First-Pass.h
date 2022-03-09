@@ -6,16 +6,16 @@
 #define IC_START 100
 #define DC_START 0
 
-#define CHECK_NAME(name) \
-            if (!nameCheck(name)) \
+#define CHECK_TAG_NAME \
+            if (!nameCheck(tagName)) \
             { \
-                printf("Illegal tag name: \"%s\"\n", name); \
+                printf("Illegal tag name: \"%s\"\n", tagName); \
                 errors = true; \
                 continue; \
             } \
-            if (!tableSearch(name)) \
+            if (!tableSearch(tagName)) \
             { \
-                printf("Duplicate tag name: %s\n",name); \
+                printf("Duplicate tag name: %s\n",tagName); \
                 errors = true; \
                 continue; \
             }
