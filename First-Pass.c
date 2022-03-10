@@ -1,4 +1,5 @@
 #include "First-Pass.h"
+#include "Second-Pass.h"
 
 Word memory[MEM_SIZE];
 int IC = IC_START, DC = DC_START;
@@ -90,18 +91,7 @@ bool firstPass()
         if (isData(startP))
         {
             if (symFlag)
-            {
-                symPointer->name = (char *)malloc(sizeof(tagName));
-                strcpy(symPointer->name, tagName);
-                symPointer->value = memLoc;
-                symPointer->base = memLoc/16;
-                symPointer->offset = memLoc%16;
-                symPointer->attribute.location = data;
-                symPointer->next = (Symbol *)malloc(sizeof(Symbol));
-                symPointer = symPointer->next;
-                symPointer->name = "";
-                symFlag = false;
-            }
+                symFlag = assignTag(tagName, data, none, memLoc);
 
             if (!strncmp(startP, ".data", 5))
             {
@@ -129,31 +119,12 @@ bool firstPass()
             
             CHECK_TAG_NAME
 
-            symPointer->name = (char *)malloc(sizeof(tagName));
-            strcpy(symPointer->name, tagName);
-            symPointer->value = 0;
-            symPointer->base = 0;
-            symPointer->offset = 0;
-            symPointer->attribute.type = external;
-            symPointer->next = (Symbol *)malloc(sizeof(Symbol));
-            symPointer = symPointer->next;
-            symPointer->name = "";
-            symFlag = false;
+            symFlag = assignTag(tagName, none, external, 0);
             continue;
         }
         
         if (symFlag)
-        {
-        	symPointer->name = (char *)malloc(sizeof(tagName));
-            strcpy(symPointer->name, tagName);
-            symPointer->value = memLoc;
-            symPointer->base = memLoc/16;
-            symPointer->offset = memLoc%16;
-            symPointer->attribute.location = code;
-            symPointer->next = (Symbol *)malloc(sizeof(Symbol));
-            symPointer = symPointer->next;
-            symFlag = false;
-        }
+            symFlag = assignTag(tagName, code, none, memLoc);
         
         L = analizeCode(startP);
         if (L == 0)
@@ -164,8 +135,24 @@ bool firstPass()
 
     free(tagName);
     fclose(text);
-    printMemory();
+    if (!errors) 
+        secondPass(memory, IC, DC, firstSym, symPointer, memLoc);
     return errors;
+}
+
+bool assignTag(char *name, location attrLoc, type attrType, int memo)
+{
+    symPointer->name = (char *)malloc(sizeof(name));
+    strcpy(symPointer->name, name);
+    symPointer->value = memo;
+    symPointer->base = memo/16;
+    symPointer->offset = memo%16;
+    symPointer->attribute.location = attrLoc;
+    symPointer->attribute.type = attrType;
+    symPointer->next = (Symbol *)malloc(sizeof(Symbol));
+    symPointer = symPointer->next;
+    symPointer->name = "";
+    return false;
 }
 
 bool nameCheck(char *name)
@@ -202,40 +189,6 @@ char *skipWhiteSpaces(char *p)
      int i;
      for (i = 0; p[i] != 0 && (p[i] == ' ' || p[i] == '\t'); i++); /*Count how many white spaces are there*/
      return p + i;
-}
-
-void getAttr(int location, int type)
-{
-    bool comma = false;
-    switch (location)
-    {
-    case(0) :
-        break;
-    case(1) :
-        printf("code");
-        comma = true;
-        break;
-    case(2) :
-        printf("data");
-        comma = true;
-        break;
-    }
-    
-    switch (type)
-    {
-    case(0) :
-        break;
-    case(1) :
-        if (comma) printf(", ");
-        printf("entry");
-        break;
-    case(2) :
-        if (comma) printf(", ");
-        printf("extern");
-        break;
-    }
-    printf("\n");
-    return;
 }
 
 void codeString(char *p)
@@ -412,7 +365,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             {
                 if (!isalpha(operand[j]))
                 {
-                    printf("[%d] Illegal character in tag name!", lineCount);
+                    printf("[%d] Illegal character in tag name!\n", lineCount);
                     return -1;
                 }
                 isTag = true;
@@ -432,29 +385,34 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             }
         }
     }
+    
+    if (!isalpha(*operand))
+    {
+        printf("[%d] Illegal starting character in tag name!\n", lineCount);
+        return -1;
+    }
+
+    /* Check index addressing type */
+    for (j = 1; j < strlen(operand); j++)
+    {
+        if (operand[j] == '[' && j+3 < strlen(operand))
+        {
+            if (operand[j+1] != 'r' || !isdigit(operand[j+2]))
+            {
+                printf("[%d] Unkown register name\n", lineCount);
+                return -1;
+            }
+            if (operand[j+3] != ']' && (j+4 < strlen(operand) && operand[j+4] != ']'))
+            {
+                printf("[%d] Missing closing square bracket\n", lineCount);
+                return -1;
+            }
+        }
+    }
+
     if (modes[direct])
         return 2;
-    printf("[%d] instruction doesnt support tag type addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+    
+    printf("[%d] instruction doesnt support direct and index addressing modes for %s operand\n", lineCount, DIRECTION(dir));
     return -1;
-}
-
-void printMemory()
-{
-    int i;
-    symPointer = &firstSym;
-    printf("ICF = %d, DCF = %d\n", IC, DC);
-    printf("NAME:\tVALUE:\tBASE:\tOFFSET:\tATTRIBUTES:\n");
-    while(symPointer->next != NULL)
-    {
-        printf("%s\t%d\t%d\t%d\t", symPointer->name, symPointer->value, symPointer->base, symPointer->offset);
-        getAttr(symPointer->attribute.location, symPointer->attribute.type);
-        symPointer = symPointer->next;
-    }
-    for (i = 0; i < MEM_SIZE; i++)
-    {
-        if (memory[i].quarter.A != 0)
-            printf("%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
-                memory[i].quarter.A, memory[i].quarter.B, memory[i].quarter.C, memory[i].quarter.D, memory[i].quarter.E);
-    }
-    return;
 }

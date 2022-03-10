@@ -18,8 +18,8 @@ typedef enum boolean
 } bool;
 
 enum none {none = 0};
-enum location {code = 1, data = 2};
-enum type {entry = 1, external = 2};
+typedef enum location {code = 1, data = 2} location;
+typedef enum type {entry = 1, external = 2} type;
 
 typedef union Word
 {

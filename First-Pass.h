@@ -21,16 +21,15 @@
             }
 
 bool firstPass();
+bool assignTag(char *name, location attrLoc, type attrType, int memo);
 bool nameCheck(char *name);
 bool isData(char *p);
 char *skipWhiteSpaces(char *p);
-void getAttr(int location, int type);
 void codeString(char *p);
 void codeData(char *p);
 void removeSpaces(char *str);
 bool tableSearch(char *name);
 int analizeCode(char *codeLine);
 int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, direction dir);
-void printMemory();
 
 #endif
