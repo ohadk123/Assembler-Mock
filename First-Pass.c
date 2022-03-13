@@ -31,7 +31,7 @@ bool firstPass()
     char line[MAX_LINE];
     char *startP;
     char *endP;
-    char *tagName = (char *)malloc(sizeof(char *));
+    char *labelName = (char *)malloc(sizeof(char *));
     bool symFlag = false;
     int i;
     bool errors = false;
@@ -49,7 +49,7 @@ bool firstPass()
     while (fgets(line, MAX_LINE, text) != NULL)
     {
 
-        tagName = " ";
+        labelName = " ";
         startP = line;
         endP = line;
         symFlag = false;
@@ -71,15 +71,15 @@ bool firstPass()
         while (endP[1] != ' ')
             endP++;
 
-        /* Locating tags */
+        /* Locating labels */
         if (*endP == ':')
         {
             symFlag = true;
-            tagName = (char *)calloc((endP-startP), sizeof(char));
+            labelName = (char *)calloc((endP-startP), sizeof(char));
             for (i = 0; startP[i] != ':'; i++)
-                tagName[i] = startP[i];
+                labelName[i] = startP[i];
             
-            CHECK_TAG_NAME
+            CHECK_LABEL_NAME
 
             startP = ++endP;
         }
@@ -90,7 +90,7 @@ bool firstPass()
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)))
         {
             if (symFlag)
-                symFlag = assignTag(tagName, data, none, memLoc);
+                symFlag = assignLabel(labelName, data, none, memLoc);
 
             if (!strncmp(startP, DATA, strlen(DATA)))
             {
@@ -111,19 +111,19 @@ bool firstPass()
         /* Handling extern type */
         if (!strncmp(startP, EXTERN, strlen(EXTERN)))
         {
-            tagName = (char *)malloc(sizeof(endP+2));
-            strcpy(tagName, endP+2);
-            if (tagName[strlen(tagName)-1] == '\n')
-                tagName[strlen(tagName)-1] = '\0';
+            labelName = (char *)malloc(sizeof(endP+2));
+            strcpy(labelName, endP+2);
+            if (labelName[strlen(labelName)-1] == '\n')
+                labelName[strlen(labelName)-1] = '\0';
             
-            CHECK_TAG_NAME
+            CHECK_LABEL_NAME
 
-            symFlag = assignTag(tagName, none, external, 0);
+            symFlag = assignLabel(labelName, none, external, 0);
             continue;
         }
         
         if (symFlag)
-            symFlag = assignTag(tagName, code, none, memLoc);
+            symFlag = assignLabel(labelName, code, none, memLoc);
         
         L = analizeCode(startP);
         if (L == 0)
@@ -132,14 +132,14 @@ bool firstPass()
         memLoc += L;
     }
 
-    free(tagName);
+    free(labelName);
     fclose(text);
     if (!errors) 
         secondPass(memory, IC, DC, firstSym, symPointer);
     return errors;
 }
 
-bool assignTag(char *name, location attrLoc, type attrType, int memo)
+bool assignLabel(char *name, location attrLoc, type attrType, int memo)
 {
     symPointer->name = (char *)malloc(sizeof(name));
     strcpy(symPointer->name, name);
@@ -329,7 +329,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
 {
     #define DIRECTION(dir) dir ? "destination" : "origin"
     int j = 0;
-    bool isTag = false;
+    bool isLabel = false;
     int number;
 
     /* Checks for immediate addressing mode
@@ -359,11 +359,11 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         printf("[%d] instruction doesnt support immidiate addressing mode for %s operand\n", lineCount, DIRECTION(dir));
         return -1;
     }
-    /* Check if operand is a register or a tag
-     * Register name is only a whole number, might be a tag if a char is not a digit
+    /* Check if operand is a register or a label
+     * Register name is only a whole number, might be a label if a char is not a digit
      * Error if the char is not a letter as well
-     * If all characters are digits, it might be a register or a tag 
-     * Register names are in range 0-15, else might be a tag */
+     * If all characters are digits, it might be a register or a label 
+     * Register names are in range 0-15, else might be a label */
     else if (*operand == 'r')
     {
         for (j = 1; j < strlen(operand); j++)
@@ -372,17 +372,17 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             {
                 if (!isalpha(operand[j]))
                 {
-                    printf("[%d] Illegal character in tag name!\n", lineCount);
+                    printf("[%d] Illegal character in label name!\n", lineCount);
                     return -1;
                 }
-                isTag = true;
+                isLabel = true;
             }
         }
-        if (!isTag)
+        if (!isLabel)
         {
             number = atoi(operand+1);
             if (number > 15)
-                isTag = true;
+                isLabel = true;
             else
             {
                 if (modes[regDirect])
@@ -407,7 +407,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     
     if (!isalpha(*operand))
     {
-        printf("[%d] Illegal starting character in tag name!\n", lineCount);
+        printf("[%d] Illegal starting character in label name!\n", lineCount);
         return -1;
     }
 
@@ -457,7 +457,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             memory[memLoc+1].opcode.origMode = direct;
         return 2;
     }
-    
+
     printf("[%d] instruction doesnt support direct addressing modes for %s operand\n", lineCount, DIRECTION(dir));
     return -1;
 }

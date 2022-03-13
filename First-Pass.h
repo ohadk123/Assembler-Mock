@@ -10,22 +10,22 @@
 #define EXTERN ".extern"
 #define ENTRY ".entry"
 
-#define CHECK_TAG_NAME \
-            if (!nameCheck(tagName)) \
+#define CHECK_LABEL_NAME \
+            if (!nameCheck(labelName)) \
             { \
-                printf("[%d] Illegal tag name: \"%s\"\n", lineCount, tagName); \
+                printf("[%d] Illegal label name: \"%s\"\n", lineCount, labelName); \
                 errors = true; \
                 continue; \
             } \
-            if (!tableSearch(tagName)) \
+            if (!tableSearch(labelName)) \
             { \
-                printf("[%d] Duplicate tag name: %s\n", lineCount, tagName); \
+                printf("[%d] Duplicate label name: %s\n", lineCount, labelName); \
                 errors = true; \
                 continue; \
             }
 
 bool firstPass();
-bool assignTag(char *name, location attrLoc, type attrType, int memo);
+bool assignLabel(char *name, location attrLoc, type attrType, int memo);
 bool nameCheck(char *name);
 char *skipWhiteSpaces(char *p);
 void codeString(char *p);
