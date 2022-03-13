@@ -47,7 +47,7 @@ typedef union Word
 
      short base;
      short offset;
-     unsigned short number;
+     short number;
 } Word;
 
 typedef struct Symbol
@@ -70,7 +70,7 @@ typedef enum direction {origin, destination} direction;
 typedef struct Instruction
 {
      char *name;
-     double opcode;
+     int opcode;
      int funct;
      int numOfOps;
      /* {immidiate, direct, index, regDirect} */

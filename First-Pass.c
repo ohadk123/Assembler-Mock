@@ -36,16 +36,15 @@ bool firstPass()
     int i;
     bool errors = false;
 
-    /* Opening the processed code */ {
+    /* Opening the processed code */
     text = fopen("output.txt", "r");
     if (text == NULL)
-     {
-          printf("Error in pre-Assembler runtime\n");
-          printf("The program will continue to the next file\n");
-          return false;
-     }
-     fseek(text, 0, SEEK_SET);
+    {
+        printf("Error in pre-Assembler runtime\n");
+        printf("The program will continue to the next file\n");
+        return false;
     }
+    fseek(text, 0, SEEK_SET);
 
     while (fgets(line, MAX_LINE, text) != NULL)
     {
@@ -88,29 +87,29 @@ bool firstPass()
         startP = skipWhiteSpaces(startP);
 
         /* Handling data encoding */
-        if (isData(startP))
+        if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)))
         {
             if (symFlag)
                 symFlag = assignTag(tagName, data, none, memLoc);
 
-            if (!strncmp(startP, ".data", 5))
+            if (!strncmp(startP, DATA, strlen(DATA)))
             {
                 removeSpaces(startP);
-                codeData(startP + 5);
+                codeData(startP + strlen(DATA));
             }
             else
             {
-                codeString(startP + 9);
+                codeString(startP + strlen(STRING) + 2);
             }
             continue;
         }
 
         /* Entry type handled in second pass */
-        if (!strncmp(startP, ".entry", 6))
+        if (!strncmp(startP, ENTRY, strlen(ENTRY)))
             continue;
 
         /* Handling extern type */
-        if (!strncmp(startP, ".extern", 7))
+        if (!strncmp(startP, EXTERN, strlen(EXTERN)))
         {
             tagName = (char *)malloc(sizeof(endP+2));
             strcpy(tagName, endP+2);
@@ -136,7 +135,7 @@ bool firstPass()
     free(tagName);
     fclose(text);
     if (!errors) 
-        secondPass(memory, IC, DC, firstSym, symPointer, memLoc);
+        secondPass(memory, IC, DC, firstSym, symPointer);
     return errors;
 }
 
@@ -175,13 +174,6 @@ bool nameCheck(char *name)
     }
 
     return true;
-}
-
-bool isData(char *p)
-{
-    if (!strncmp(p, ".data", 5) || !strncmp(p, ".string", 7))
-        return true;
-    return false;
 }
 
 char *skipWhiteSpaces(char *p)
@@ -261,19 +253,23 @@ int analizeCode(char *codeLine)
     char *firstOp, *secondOp;
     char ct[2] = ",";
 	int i, j, L = 1, l;
-    Instruction *instruct;
+    Instruction instruct;
     direction dir;
 	
     for (i = 0; i < size; i++)
     {
-        instruct = instructions + i;
-        if (strlen(codeLine) >= strlen(instruct->name) && !strncmp(codeLine, instruct->name, strlen(instruct->name)))
+        instruct = instructions[i];
+        if (strlen(codeLine) >= strlen(instruct.name) && !strncmp(codeLine, instruct.name, strlen(instruct.name)))
         {
             for (j = 0; codeLine[j] != ' ' && codeLine[j] != '\t' && codeLine[j] != '\n'; j++); /* Skips instruction */
             codeLine = skipWhiteSpaces(codeLine+j); /* Ignoring white space after instruction */
             codeLine[strlen(codeLine)-1] = '\0'; /* Removing \n from the end for convenience */
             firstOp = strtok(codeLine, ct); /* First operand */
             secondOp = strtok(NULL, ct); /* Second operand */
+
+            memory[memLoc].opcode.A = 1;
+            memory[memLoc].number = 1;
+            memory[memLoc].number = memory[memLoc].number << instruct.opcode;
 
             /* There never is a third operand, error if there is */
             if (strtok(NULL, ct) != NULL) 
@@ -284,7 +280,7 @@ int analizeCode(char *codeLine)
 
             /* If no operands needed, error if first operand exists
              * Zero operand instructions use only 1 word */
-            if (instruct->numOfOps == 0)
+            if (instruct.numOfOps == 0)
             {
                 if (firstOp != NULL)
                 {
@@ -294,26 +290,29 @@ int analizeCode(char *codeLine)
                     return L;
             }
             
-            L++; /*Funct word */
+            /*Funct word */
+            L++;
+            memory[memLoc+1].opcode.A = 1;
+            memory[memLoc+1].opcode.funct = instruct.funct;
 
             /* If only one operand needed, error occures if even second operand exists */
-            if (instruct->numOfOps == 1 && secondOp != NULL)
+            if (instruct.numOfOps == 1 && secondOp != NULL)
             {
                 printf("[%d] Too many operands!\n", lineCount);
                 return 0;
             }
 
-            dir = instruct->numOfOps == 1 ? destination : origin;
+            dir = instruct.numOfOps == 1 ? destination : origin;
 
-            l = identifyAddressingMode(firstOp, *instruct, dir ? instruct->destModes : instruct->origModes, dir);
+            l = identifyAddressingMode(firstOp, instruct, dir ? instruct.destModes : instruct.origModes, dir, L);
             if (l == -1)
                 return 0;
             L += l;
-            if (instruct->numOfOps == 1) /* If only one operand needed we are done here */
+            if (instruct.numOfOps == 1) /* If only one operand needed we are done here */
                 return L;
 
             secondOp = skipWhiteSpaces(secondOp);
-            l = identifyAddressingMode(secondOp, *instruct, instruct->destModes, destination);
+            l = identifyAddressingMode(secondOp, instruct, instruct.destModes, destination, L);
             if (l == -1)
                 return 0;
             L+= l;
@@ -326,7 +325,7 @@ int analizeCode(char *codeLine)
     return 0;
 }
 
-int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, direction dir)
+int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, direction dir, int L)
 {
     #define DIRECTION(dir) dir ? "destination" : "origin"
     int j = 0;
@@ -348,7 +347,15 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             }
         }
         if (modes[immediate])
+        {
+            memory[memLoc+L].opcode.A = 1;
+            memory[memLoc+L].number = atoi(operand+1);
+            if (dir)
+                memory[memLoc+1].opcode.destMode = immediate;
+            else
+                memory[memLoc+1].opcode.origMode = immediate;
             return 1;
+        }
         printf("[%d] instruction doesnt support immidiate addressing mode for %s operand\n", lineCount, DIRECTION(dir));
         return -1;
     }
@@ -379,7 +386,19 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             else
             {
                 if (modes[regDirect])
+                {
+                    if (dir)
+                    {
+                        memory[memLoc+1].opcode.destMode = regDirect;
+                        memory[memLoc+1].opcode.destReg = number;
+                    }
+                    else
+                    {
+                        memory[memLoc+1].opcode.origMode = regDirect;
+                        memory[memLoc+1].opcode.origReg = number;
+                    }
                     return 0;
+                }
                 printf("[%d] instruction doesnt support register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
                 return -1;
             }
@@ -397,7 +416,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     {
         if (operand[j] == '[' && j+3 < strlen(operand))
         {
-            if (operand[j+1] != 'r' || !isdigit(operand[j+2]))
+            if (operand[j+1] != 'r' || !isdigit(operand[j+2]) || (!isdigit(operand[j+3]) && operand[j+3] != ']'))
             {
                 printf("[%d] Unkown register name\n", lineCount);
                 return -1;
@@ -407,12 +426,38 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 printf("[%d] Missing closing square bracket\n", lineCount);
                 return -1;
             }
+
+            number = atoi(operand+j+2);
+
+            if (modes[index])
+            {
+                if (dir)
+                {
+                    memory[memLoc+1].opcode.destMode = index;
+                    memory[memLoc+1].opcode.destReg = number;
+                }
+                else
+                {
+                    memory[memLoc+1].opcode.origMode = index;
+                    memory[memLoc+1].opcode.origReg = number;
+                }
+                return 2;
+            }
+
+            printf("[%d] Instruction doesn't support index addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+            return -1;
         }
     }
 
     if (modes[direct])
+    {
+        if (dir)
+            memory[memLoc+1].opcode.destMode = direct;
+        else
+            memory[memLoc+1].opcode.origMode = direct;
         return 2;
+    }
     
-    printf("[%d] instruction doesnt support direct and index addressing modes for %s operand\n", lineCount, DIRECTION(dir));
+    printf("[%d] instruction doesnt support direct addressing modes for %s operand\n", lineCount, DIRECTION(dir));
     return -1;
 }
