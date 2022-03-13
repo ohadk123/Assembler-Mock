@@ -50,7 +50,7 @@ typedef union Word
      short number;
 } Word;
 
-typedef struct Symbol
+typedef struct Label
 {
      char *name;
      int value;
@@ -61,8 +61,8 @@ typedef struct Symbol
           int location;
           int type;
      } attribute;
-     struct Symbol *next;
-} Symbol;
+     struct Label *next;
+} Label;
 
 enum addressingModes {immediate, direct, index, regDirect};
 typedef enum direction {origin, destination} direction;

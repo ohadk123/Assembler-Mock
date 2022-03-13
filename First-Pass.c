@@ -3,8 +3,8 @@
 
 Word memory[MEM_SIZE];
 int IC = IC_START, DC = DC_START;
-Symbol firstSym = {"", 0, 0, 0, {0, 0}, NULL};
-Symbol *symPointer = &firstSym;
+Label firstLabel = {"", 0, 0, 0, {0, 0}, NULL};
+Label *labelPointer = &firstLabel;
 int memLoc = IC_START;
 int lineCount = 0;
 int L;                                          /* {immid, direc, index, reg}    {immid, direc, index, reg} */
@@ -32,7 +32,7 @@ bool firstPass()
     char *startP;
     char *endP;
     char *labelName = (char *)malloc(sizeof(char *));
-    bool symFlag = false;
+    bool labelFlag = false;
     int i;
     bool errors = false;
 
@@ -52,7 +52,7 @@ bool firstPass()
         labelName = " ";
         startP = line;
         endP = line;
-        symFlag = false;
+        labelFlag = false;
 
         if (isdigit(*startP))
         {
@@ -74,7 +74,7 @@ bool firstPass()
         /* Locating labels */
         if (*endP == ':')
         {
-            symFlag = true;
+            labelFlag = true;
             labelName = (char *)calloc((endP-startP), sizeof(char));
             for (i = 0; startP[i] != ':'; i++)
                 labelName[i] = startP[i];
@@ -89,8 +89,8 @@ bool firstPass()
         /* Handling data encoding */
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)))
         {
-            if (symFlag)
-                symFlag = assignLabel(labelName, data, none, memLoc);
+            if (labelFlag)
+                labelFlag = assignLabel(labelName, data, none, memLoc);
 
             if (!strncmp(startP, DATA, strlen(DATA)))
             {
@@ -118,12 +118,12 @@ bool firstPass()
             
             CHECK_LABEL_NAME
 
-            symFlag = assignLabel(labelName, none, external, 0);
+            labelFlag = assignLabel(labelName, none, external, 0);
             continue;
         }
         
-        if (symFlag)
-            symFlag = assignLabel(labelName, code, none, memLoc);
+        if (labelFlag)
+            labelFlag = assignLabel(labelName, code, none, memLoc);
         
         L = analizeCode(startP);
         if (L == 0)
@@ -135,22 +135,22 @@ bool firstPass()
     free(labelName);
     fclose(text);
     if (!errors) 
-        secondPass(memory, IC, DC, firstSym, symPointer);
+        secondPass(memory, IC, DC, firstLabel, labelPointer);
     return errors;
 }
 
 bool assignLabel(char *name, location attrLoc, type attrType, int memo)
 {
-    symPointer->name = (char *)malloc(sizeof(name));
-    strcpy(symPointer->name, name);
-    symPointer->value = memo;
-    symPointer->base = memo/16;
-    symPointer->offset = memo%16;
-    symPointer->attribute.location = attrLoc;
-    symPointer->attribute.type = attrType;
-    symPointer->next = (Symbol *)malloc(sizeof(Symbol));
-    symPointer = symPointer->next;
-    symPointer->name = "";
+    labelPointer->name = (char *)malloc(sizeof(name));
+    strcpy(labelPointer->name, name);
+    labelPointer->value = memo;
+    labelPointer->base = memo/16;
+    labelPointer->offset = memo%16;
+    labelPointer->attribute.location = attrLoc;
+    labelPointer->attribute.type = attrType;
+    labelPointer->next = (Label *)malloc(sizeof(Label));
+    labelPointer = labelPointer->next;
+    labelPointer->name = "";
     return false;
 }
 
@@ -237,12 +237,12 @@ void removeSpaces(char *str)
 
 bool tableSearch(char *name)
 {
-    Symbol *symP = &firstSym;
-    while (symP != symPointer)
+    Label *labelP = &firstLabel;
+    while (labelP != labelPointer)
     {
-        if (!strcmp(symP->name, name))
+        if (!strcmp(labelP->name, name))
             return false;
-        symP = symP->next;
+        labelP = labelP->next;
     }
     return true;
 }

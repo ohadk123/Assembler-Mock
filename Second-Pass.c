@@ -4,13 +4,13 @@
 int lineCount;
 int memLoc;
 
-bool secondPass(Word *memory, int ICF, int DCF, Symbol firstSym, Symbol *symPointer)
+bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPointer)
 {
     FILE *text;
     char line[MAX_LINE];
     char *startP;
     char *endP;
-    char *tagName = (char *)malloc(sizeof(char *));
+    char *labelName = (char *)malloc(sizeof(char *));
     int i;
     bool errors = false;
     memLoc = IC_START;
@@ -28,7 +28,7 @@ bool secondPass(Word *memory, int ICF, int DCF, Symbol firstSym, Symbol *symPoin
     while (fgets(line, MAX_LINE, text) != NULL)
     {
 
-        tagName = " ";
+        labelName = " ";
         startP = line;
         endP = line;
 
@@ -49,7 +49,7 @@ bool secondPass(Word *memory, int ICF, int DCF, Symbol firstSym, Symbol *symPoin
         while (endP[1] != ' ')
             endP++;
 
-        /* Skipping tags */
+        /* Skipping labels */
         if (*endP == ':')
             startP = ++endP;
         startP = skipWhiteSpaces(startP);
@@ -58,14 +58,14 @@ bool secondPass(Word *memory, int ICF, int DCF, Symbol firstSym, Symbol *symPoin
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)) || !strncmp(startP, EXTERN, strlen(EXTERN)))
             continue;
         
-        /* Add entry attribute to tag */
+        /* Add entry attribute to label */
         if (!strncmp(startP, ENTRY, strlen(ENTRY)))
         {
-            tagName = (char *)malloc(sizeof(endP+2));
-            strcpy(tagName, endP+2);
-            if (tagName[strlen(tagName)-1] == '\n')
-                tagName[strlen(tagName)-1] = '\0';
-            errors = codeEntry(&firstSym, symPointer, tagName);
+            labelName = (char *)malloc(sizeof(endP+2));
+            strcpy(labelName, endP+2);
+            if (labelName[strlen(labelName)-1] == '\n')
+                labelName[strlen(labelName)-1] = '\0';
+            errors = codeEntry(&firstLabel, labelPointer, labelName);
             continue;
         }
 
@@ -74,45 +74,45 @@ bool secondPass(Word *memory, int ICF, int DCF, Symbol firstSym, Symbol *symPoin
             continue;
         startP = skipWhiteSpaces(startP);
         
-        codeLine(memory, startP, symPointer, &firstSym);
+        codeLine(memory, startP, labelPointer, &firstLabel);
     }
 
-    printMemory(memory, firstSym, symPointer, ICF, DCF);
+    printMemory(memory, firstLabel, labelPointer, ICF, DCF);
     remove ("output.txt");
     return errors;
 }
 
-bool codeEntry(Symbol *symP, Symbol *symPointer ,char *name)
+bool codeEntry(Label *labelP, Label *labelPointer ,char *name)
 {
-    while (symP != symPointer)
+    while (labelP != labelPointer)
     {
-        if (!strcmp(symP->name, name))
+        if (!strcmp(labelP->name, name))
             {
-                symP->attribute.type = entry;
+                labelP->attribute.type = entry;
                 return false;
             }
-        symP = symP->next;
+        labelP = labelP->next;
     }
     printf("[%d] Label %s is not used!\n", lineCount, name);
     return true;
 }
 
-void codeLine(Word *memory, char *line, Symbol *symPointer, Symbol *firstSym)
+void codeLine(Word *memory, char *line, Label *labelPointer, Label *firstLabel)
 {
 
 }
 
-void printMemory(Word *memory, Symbol firstSym, Symbol *symPointer, int IC, int DC)
+void printMemory(Word *memory, Label firstLabel, Label *labelPointer, int IC, int DC)
 {
     int i;
-    symPointer = &firstSym;
+    labelPointer = &firstLabel;
     printf("ICF = %d, DCF = %d\n", IC, DC);
     printf("NAME:\tVALUE:\tBASE:\tOFFSET:\tATTRIBUTES:\n");
-    while(symPointer->next != NULL)
+    while(labelPointer->next != NULL)
     {
-        printf("%s\t%d\t%d\t%d\t", symPointer->name, symPointer->value, symPointer->base, symPointer->offset);
-        getAttr(symPointer->attribute.location, symPointer->attribute.type);
-        symPointer = symPointer->next;
+        printf("%s\t%d\t%d\t%d\t", labelPointer->name, labelPointer->value, labelPointer->base, labelPointer->offset);
+        getAttr(labelPointer->attribute.location, labelPointer->attribute.type);
+        labelPointer = labelPointer->next;
     }
     for (i = 0; i < MEM_SIZE; i++)
     {
