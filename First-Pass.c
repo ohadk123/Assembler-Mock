@@ -25,7 +25,7 @@ Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true}, 
                               {"rts", 14.0, 0, 0,  {false, false, false, false}, {false, false, false, false}},
                               {"stop", 15.0, 0, 0, {false, false, false, false}, {false, false, false, false}}};
 
-bool firstPass()
+bool firstPass(char *fileName)
 {
     FILE *text;
     char line[MAX_LINE];
@@ -135,7 +135,7 @@ bool firstPass()
     free(labelName);
     fclose(text);
     if (!errors) 
-        secondPass(memory, IC, DC, firstLabel, labelPointer);
+        secondPass(memory, IC, DC, firstLabel, labelPointer, fileName);
     return errors;
 }
 
@@ -144,7 +144,7 @@ bool assignLabel(char *name, location attrLoc, type attrType, int memo)
     labelPointer->name = (char *)malloc(sizeof(name));
     strcpy(labelPointer->name, name);
     labelPointer->value = memo;
-    labelPointer->base = memo/16;
+    labelPointer->base = (memo/16)*16;
     labelPointer->offset = memo%16;
     labelPointer->attribute.location = attrLoc;
     labelPointer->attribute.type = attrType;

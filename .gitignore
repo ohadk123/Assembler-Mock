@@ -1,5 +1,6 @@
 # Project files
 *.as
+*.am
 *.txt
 *.ob
 *.ent

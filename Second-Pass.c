@@ -3,8 +3,9 @@
 
 int lineCount;
 int memLoc;
+bool errors = false;
 
-bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPointer)
+void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName)
 {
     FILE *text;
     char line[MAX_LINE];
@@ -13,7 +14,7 @@ bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPo
     char *labelName = (char *)malloc(sizeof(char *));
     int i;
     bool errors = false;
-    memLoc = IC_START;
+    for (memLoc = IC_START; memory[memLoc].opcode.A != 0; memLoc++);
 
     /* Opening the processed code */
     text = fopen("output.txt", "r");
@@ -21,7 +22,7 @@ bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPo
     {
         printf("Error in pre-Assembler runtime\n");
         printf("The program will continue to the next file\n");
-        return false;
+        return;
     }
     fseek(text, 0, SEEK_SET);
 
@@ -65,7 +66,7 @@ bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPo
             strcpy(labelName, endP+2);
             if (labelName[strlen(labelName)-1] == '\n')
                 labelName[strlen(labelName)-1] = '\0';
-            errors = codeEntry(&firstLabel, labelPointer, labelName);
+            errors = codeEntry(&firstLabel, lastLabel, labelName);
             continue;
         }
 
@@ -74,17 +75,20 @@ bool secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *labelPo
             continue;
         startP = skipWhiteSpaces(startP);
         
-        codeLine(memory, startP, labelPointer, &firstLabel);
+        codeLine(memory, startP, lastLabel, &firstLabel);
     }
 
-    printMemory(memory, firstLabel, labelPointer, ICF, DCF);
+    if (!errors)
+        outputFile(memory, &firstLabel, lastLabel, ICF, DCF, fileName);
+    else
+        remove(strcat(fileName, ".am"));
     remove ("output.txt");
-    return errors;
+    return;
 }
 
-bool codeEntry(Label *labelP, Label *labelPointer ,char *name)
+bool codeEntry(Label *labelP, Label *lastLabel ,char *name)
 {
-    while (labelP != labelPointer)
+    while (labelP != lastLabel)
     {
         if (!strcmp(labelP->name, name))
             {
@@ -97,29 +101,139 @@ bool codeEntry(Label *labelP, Label *labelPointer ,char *name)
     return true;
 }
 
-void codeLine(Word *memory, char *line, Label *labelPointer, Label *firstLabel)
-{
-
-}
-
-void printMemory(Word *memory, Label firstLabel, Label *labelPointer, int IC, int DC)
+void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
 {
     int i;
-    labelPointer = &firstLabel;
-    printf("ICF = %d, DCF = %d\n", IC, DC);
-    printf("NAME:\tVALUE:\tBASE:\tOFFSET:\tATTRIBUTES:\n");
-    while(labelPointer->next != NULL)
+    char *ct = ",";
+    char *firstOp;
+    char *secondOp;
+
+    line[strlen(line)-1] = '\0'; /* Removing \n from the end for convenience */
+    firstOp = strtok(line, ct); /* First operand */
+    secondOp = strtok(NULL, ct); /* Second operand */
+
+    if (*firstOp == '#');
+    else if (*firstOp == 'r')
     {
-        printf("%s\t%d\t%d\t%d\t", labelPointer->name, labelPointer->value, labelPointer->base, labelPointer->offset);
-        getAttr(labelPointer->attribute.location, labelPointer->attribute.type);
-        labelPointer = labelPointer->next;
+        for (i = 1; i <strlen(firstOp); i++)
+            if (isalpha(firstOp[i]))
+                errors = !getLabel(memory, lastLabel, firstLabel, firstOp);
     }
+    else
+    {
+        firstOp = strtok(firstOp, "[");
+        errors = !getLabel(memory, lastLabel, firstLabel, firstOp);
+    }
+
+    if (secondOp == NULL)
+        return;
+    secondOp = skipWhiteSpaces(secondOp);
+
+    if (*secondOp == '#');
+    else if (*secondOp == 'r')
+    {
+        for (i = 1; i <strlen(secondOp); i++)
+            if (isalpha(secondOp[i]))
+                errors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+    }
+    else
+    {
+        secondOp = strtok(secondOp, "[");
+        errors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+    }
+    for (; memory[memLoc].opcode.A != 0; memLoc++);
+    return;
+}
+
+bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
+{
+    for (; labelP != lastLabel; labelP = labelP->next)
+    {
+        if (!strcmp(labelP->name, name))
+        {
+            switch (labelP->attribute.type)
+            {
+            case (external) :
+                memory[memLoc].opcode.E = 1;
+                memory[memLoc+1].opcode.E = 1;
+                break;
+            default :
+                memory[memLoc].opcode.R = 1;
+                memory[memLoc+1].opcode.R = 1;
+                break;
+            }
+            memory[memLoc].number = labelP->base;
+            memLoc++;
+            memory[memLoc].number = labelP->offset;
+            memLoc++;
+            return true;
+        }
+    }
+    
+    printf("[%d] label name \"%s\" not recognized\n", lineCount, name);
+    return false;
+}
+
+void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int DCF, char *fileName)
+{
+    char *argv = (char *)malloc(sizeof(fileName));
+    Label *labelP;
+    FILE *object;
+    FILE *externals;
+    FILE *entries;
+    int i;
+
+    object = fopen(strcat(strcpy(argv, fileName), ".ob"), "w");
+    fseek(object, 0, SEEK_SET);
+
+    /* Create externals file only if there are externals */
+    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+    {
+        if (labelP->attribute.type == external)
+        {
+            externals = fopen(strcat(strcpy(argv, fileName), ".ext"), "w");
+            fseek(externals, 0, SEEK_SET);
+            break;
+        }
+    }
+
+    /* Create entries file only if there are entries */
+    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+    {
+        if (labelP->attribute.type == entry)
+        {
+            entries = fopen(strcat(strcpy(argv, fileName), ".ent"), "w");
+            fseek(entries, 0, SEEK_SET);
+            break;
+        }
+    }
+
+    /* Make objects file */
+    fprintf(object, "\t\t\t%d\t%d\n", ICF-IC_START, DCF);
     for (i = 0; i < MEM_SIZE; i++)
     {
         if (memory[i].quarter.A != 0)
-            printf("%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
+            fprintf(object, "%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
                 memory[i].quarter.A, memory[i].quarter.B, memory[i].quarter.C, memory[i].quarter.D, memory[i].quarter.E);
     }
+
+    /* Make entries and external files */
+    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+    {
+        if (labelP->attribute.type == external)
+        {
+            fprintf(externals, "%s BASE %d\n", labelP->name, labelP->base);
+            fprintf(externals, "%s OFFSET %d\n", labelP->name, labelP->offset);
+        }
+
+        if (labelP->attribute.type == entry)
+            fprintf(entries, "%s,%d,%d\n", labelP->name, labelP->base, labelP->offset);
+    }
+
+    fclose(object);
+    fclose(entries);
+    fclose(externals);
+    free(argv);
     return;
 }
 

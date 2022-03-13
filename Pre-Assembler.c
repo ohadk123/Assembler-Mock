@@ -3,7 +3,8 @@
 char macroNames[MAX_LINE][MAX_LINE];	  /* Contains the names of the macros of the code                            */
 char macroList[MAX_LINE][MAX_MACRO_SIZE]; /* Contains the contents of the macros of the code                         */
 char *mPtr;						  /* A pointer used for strings in macro process                             */
-FILE *output;					       /* A pointer to the file which the pre-assembler stage code will output to */
+FILE *output;
+FILE *am;					       /* A pointer to the file which the pre-assembler stage code will output to */
 
 bool preAssembler(char *argv)
 {
@@ -25,6 +26,8 @@ bool preAssembler(char *argv)
 
      /*Creates a new file to write the code into*/
      output = fopen("output.txt", "w");
+     fseek(output, 0, SEEK_SET);
+     am = fopen(strcat(strcpy(fileName, argv), ".am"), "w");
      fseek(output, 0, SEEK_SET);
 
      /*Process the code line by line*/
@@ -64,6 +67,7 @@ bool preAssembler(char *argv)
           /*printLine is false when the line is a macro name*/
           if (printLine)
           {
+               fprintf(am, "%s", p);
                fprintf(output, "%d %s", i, p);
                i++;
           }
@@ -72,6 +76,7 @@ bool preAssembler(char *argv)
      free(fileName);
      fclose(fp);
      fclose(output);
+     fclose(am);
      return true;
 }
 
@@ -103,9 +108,10 @@ int readMacro(char p[], int m, FILE *fp)
 
 void unfoldMacro(int m)
 {
-     mPtr = macroList[m]; /*Points mPtr to the macro definition*/
+     mPtr = macroList[m];
 
-     fprintf(output, "%s", macroList[m]); /*Outputs the macro*/
+     fprintf(am, "%s", macroList[m]);
+     fprintf(output, "%s", macroList[m]);
      return;
 }
 

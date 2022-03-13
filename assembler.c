@@ -15,8 +15,7 @@ int main(int argc, char *argv[])
      {
           if (!preAssembler(argv[arg]))
                continue;
-          if (!firstPass())
-               continue;
+          firstPass(argv[arg]);
      }
 
      return 0;
