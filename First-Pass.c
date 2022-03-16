@@ -7,6 +7,7 @@ Label firstLabel = {"", 0, 0, 0, {0, 0}, NULL};
 Label *labelPointer = &firstLabel;
 int memLoc = IC_START;
 int lineCount = 0;
+bool firstErrors = false;
 int L;                                          /* {immid, direc, index, reg}    {immid, direc, index, reg} */
 Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true},  {false, true,  true,  true}}, 
                               {"cmp", 1.0, 0, 2,   {true,  true,  true,  true},  {true,  true,  true,  true}},
@@ -34,7 +35,6 @@ bool firstPass(char *fileName)
     char *labelName = (char *)malloc(sizeof(char *));
     bool labelFlag = false;
     int i;
-    bool errors = false;
 
     /* Opening the processed code */
     text = fopen("output.txt", "r");
@@ -130,15 +130,15 @@ bool firstPass(char *fileName)
         
         L = analizeCode(startP);
         if (L == 0)
-            errors = true;
+            firstErrors = true;
         IC += L;
         memLoc += L;
     }
     
     fclose(text);
-    if (!errors) 
+    if (!firstErrors) 
         secondPass(memory, IC, DC, firstLabel, labelPointer, fileName);
-    return errors;
+    return firstErrors;
 }
 
 bool assignLabel(char *name, location attrLoc, type attrType, int memo)
@@ -209,6 +209,12 @@ void codeData(char *p)
     while (true)
     {
         num = atoi(p);
+        if (fabs(num) > 32767)
+        {
+            printf("[%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
+            firstErrors = true;
+            return;
+        }
         memory[memLoc].opcode.A = 1;
         memory[memLoc].number = num;
         memLoc++;
@@ -379,7 +385,13 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         if (modes[immediate])
         {
             memory[memLoc+L].opcode.A = 1;
-            memory[memLoc+L].number = atoi(operand+1);
+            number = atoi(operand+1);
+            if (fabs(number) > 32767)
+            {
+                printf("[%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
+                return -1;
+            }
+            memory[memLoc+L].number = number;
             if (dir == destination)
                 memory[memLoc+1].opcode.destMode = immediate;
             else

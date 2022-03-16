@@ -3,7 +3,7 @@
 
 int lineCount;
 int memLoc;
-bool errors = false;
+bool secondErrors = false;
 
 void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName)
 {
@@ -13,7 +13,6 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
     char *endP;
     char *labelName = (char *)malloc(sizeof(char *));
     int i;
-    bool errors = false;
     for (memLoc = IC_START; memory[memLoc].opcode.A != 0; memLoc++);
 
     /* Opening the processed code */
@@ -66,7 +65,7 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
             strcpy(labelName, endP+2);
             if (labelName[strlen(labelName)-1] == '\n')
                 labelName[strlen(labelName)-1] = '\0';
-            errors = codeEntry(&firstLabel, lastLabel, labelName);
+            secondErrors = codeEntry(&firstLabel, lastLabel, labelName);
             continue;
         }
 
@@ -78,7 +77,7 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
         codeLine(memory, startP, lastLabel, &firstLabel);
     }
 
-    if (!errors)
+    if (!secondErrors)
         outputFile(memory, &firstLabel, lastLabel, ICF, DCF, fileName);
     else
         remove(strcat(fileName, ".am"));
@@ -130,12 +129,12 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     {
         for (i = 1; i < strlen(firstOp); i++)
             if (isalpha(firstOp[i]))
-                errors = !getLabel(memory, lastLabel, firstLabel, firstOp);
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp);
     }
     else
     {
         firstOp = strtok(firstOp, "[");
-        errors = !getLabel(memory, lastLabel, firstLabel, firstOp);
+        secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp);
     }
 
     if (secondOp == NULL)
@@ -150,12 +149,12 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     {
         for (i = 1; i <strlen(secondOp); i++)
             if (isalpha(secondOp[i]))
-                errors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp);
     }
     else
     {
         secondOp = strtok(secondOp, "[");
-        errors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+        secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp);
     }
 
     for (; memory[memLoc].quarter.A != 0; memLoc++);
@@ -224,7 +223,7 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
                 if (labelP->attribute.type == external)
                 {
                     fprintf(externals, "%s BASE %04d\n", labelP->name, labelP->base);
-                    fprintf(externals, "%s OFFSET %04d\n", labelP->name, labelP->offset);
+                    fprintf(externals, "%s OFFSET %04d\n\n", labelP->name, labelP->offset);
                 }
             }
             fclose(externals);

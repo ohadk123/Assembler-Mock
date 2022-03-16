@@ -14,13 +14,13 @@
             if (!nameCheck(labelName)) \
             { \
                 printf("[%d] Illegal label name: \"%s\"\n", lineCount, labelName); \
-                errors = true; \
+                firstErrors = true; \
                 continue; \
             } \
             if (!tableSearch(labelName)) \
             { \
                 printf("[%d] Duplicate label name: %s\n", lineCount, labelName); \
-                errors = true; \
+                firstErrors = true; \
                 continue; \
             }
 
