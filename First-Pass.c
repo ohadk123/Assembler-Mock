@@ -113,8 +113,11 @@ bool firstPass(char *fileName)
         {
             labelName = (char *)malloc(sizeof(endP+2));
             strcpy(labelName, endP+2);
-            if (labelName[strlen(labelName)-1] == '\n')
-                labelName[strlen(labelName)-1] = '\0';
+            for (i = 0; i < strlen(labelName); i++)
+            {
+                if (isspace(labelName[i]))
+                    labelName[i] = '\0';
+            }
             
             CHECK_LABEL_NAME
 
@@ -131,8 +134,7 @@ bool firstPass(char *fileName)
         IC += L;
         memLoc += L;
     }
-
-    free(labelName);
+    
     fclose(text);
     if (!errors) 
         secondPass(memory, IC, DC, firstLabel, labelPointer, fileName);
@@ -206,7 +208,7 @@ void codeData(char *p)
     int num, i;
     while (true)
     {
-        num = atof(p);
+        num = atoi(p);
         memory[memLoc].opcode.A = 1;
         memory[memLoc].number = num;
         memLoc++;
@@ -304,6 +306,23 @@ int analizeCode(char *codeLine)
 
             dir = instruct.numOfOps == 1 ? destination : origin;
 
+            for (i = 0; i < strlen(firstOp); i++)
+            {
+                if (isspace(firstOp[i]))
+                {
+                    j = i;
+                    for (; i < strlen(firstOp); i++)
+                    {
+                        if (!isspace(firstOp[i]))
+                        {
+                            printf("[%d] Missing comma!\n", lineCount);
+                            return 0;
+                        }
+                    }
+                    firstOp[j] = '\0';
+                }
+            }
+
             l = identifyAddressingMode(firstOp, instruct, dir ? instruct.destModes : instruct.origModes, dir, L);
             if (l == -1)
                 return 0;
@@ -340,17 +359,28 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     {   
         for ((operand[j] == '-') ? (j = 1) : (j = 2); j < strlen(operand); j++)
         {
-            if (!isdigit(operand[j]))
+            if (!isdigit(operand[j]) && !isspace(operand[j]))
             {
                 printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
                 return -1;
+            }
+            if (isspace(operand[j]))
+            {
+                for (; j < strlen(operand); j++)
+                {
+                    if (!isspace(operand[j]))
+                    {
+                        printf("[%d] Missing comma!\n", lineCount);
+                        return -1;
+                    }
+                }
             }
         }
         if (modes[immediate])
         {
             memory[memLoc+L].opcode.A = 1;
             memory[memLoc+L].number = atoi(operand+1);
-            if (dir)
+            if (dir == destination)
                 memory[memLoc+1].opcode.destMode = immediate;
             else
                 memory[memLoc+1].opcode.origMode = immediate;
@@ -368,9 +398,21 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     {
         for (j = 1; j < strlen(operand); j++)
         {
+            if (isspace(operand[j]))
+            {
+                for (; j < strlen(operand); j++)
+                {
+                    if (!isspace(operand[j]))
+                    {
+                        printf("[%d] Missing comma!\n", lineCount);
+                        return -1;
+                    }
+                }
+                break;
+            }
             if (!isdigit(operand[j]))
             {
-                if (!isalpha(operand[j]))
+                if (!isalpha(operand[j]) && !isspace(operand[j]))
                 {
                     printf("[%d] Illegal character in label name!\n", lineCount);
                     return -1;
@@ -387,7 +429,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             {
                 if (modes[regDirect])
                 {
-                    if (dir)
+                    if (dir == destination)
                     {
                         memory[memLoc+1].opcode.destMode = regDirect;
                         memory[memLoc+1].opcode.destReg = number;
@@ -399,7 +441,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                     }
                     return 0;
                 }
-                printf("[%d] instruction doesnt support register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+                printf("[%d] instruction doesnt support direct register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
                 return -1;
             }
         }

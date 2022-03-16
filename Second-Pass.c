@@ -82,6 +82,7 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
         outputFile(memory, &firstLabel, lastLabel, ICF, DCF, fileName);
     else
         remove(strcat(fileName, ".am"));
+
     remove ("output.txt");
     return;
 }
@@ -112,10 +113,22 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     firstOp = strtok(line, ct); /* First operand */
     secondOp = strtok(NULL, ct); /* Second operand */
 
+    if (firstOp == NULL)
+    {
+        for (; memory[memLoc].quarter.A != 0; memLoc++);
+        return;
+    }
+
+    for (i = 0; i < strlen(firstOp); i++)
+    {
+        if (isspace(firstOp[i]))
+            firstOp[i] = '\0';
+    }
+
     if (*firstOp == '#');
     else if (*firstOp == 'r')
     {
-        for (i = 1; i <strlen(firstOp); i++)
+        for (i = 1; i < strlen(firstOp); i++)
             if (isalpha(firstOp[i]))
                 errors = !getLabel(memory, lastLabel, firstLabel, firstOp);
     }
@@ -126,7 +139,10 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     }
 
     if (secondOp == NULL)
+    {
+        for (; memory[memLoc].quarter.A != 0; memLoc++);
         return;
+    }
     secondOp = skipWhiteSpaces(secondOp);
 
     if (*secondOp == '#');
@@ -141,7 +157,8 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
         secondOp = strtok(secondOp, "[");
         errors = !getLabel(memory, lastLabel, firstLabel, secondOp);
     }
-    for (; memory[memLoc].opcode.A != 0; memLoc++);
+
+    for (; memory[memLoc].quarter.A != 0; memLoc++);
     return;
 }
 
@@ -156,6 +173,8 @@ bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
             case (external) :
                 memory[memLoc].opcode.E = 1;
                 memory[memLoc+1].opcode.E = 1;
+                labelP->base = memLoc;
+                labelP->offset = memLoc+1;
                 break;
             default :
                 memory[memLoc].opcode.R = 1;
@@ -163,14 +182,12 @@ bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
                 break;
             }
             memory[memLoc].number = labelP->base;
-            memLoc++;
-            memory[memLoc].number = labelP->offset;
-            memLoc++;
+            memory[memLoc+1].number = labelP->offset;
             return true;
         }
     }
     
-    printf("[%d] label name \"%s\" not recognized\n", lineCount, name);
+    printf("[%d] label name \"%s\" is not recognized\n", lineCount, name);
     return false;
 }
 
@@ -183,32 +200,9 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
     FILE *entries;
     int i;
 
+    /* Generate objects file */
     object = fopen(strcat(strcpy(argv, fileName), ".ob"), "w");
     fseek(object, 0, SEEK_SET);
-
-    /* Create externals file only if there are externals */
-    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
-    {
-        if (labelP->attribute.type == external)
-        {
-            externals = fopen(strcat(strcpy(argv, fileName), ".ext"), "w");
-            fseek(externals, 0, SEEK_SET);
-            break;
-        }
-    }
-
-    /* Create entries file only if there are entries */
-    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
-    {
-        if (labelP->attribute.type == entry)
-        {
-            entries = fopen(strcat(strcpy(argv, fileName), ".ent"), "w");
-            fseek(entries, 0, SEEK_SET);
-            break;
-        }
-    }
-
-    /* Make objects file */
     fprintf(object, "\t\t\t%d\t%d\n", ICF-IC_START, DCF);
     for (i = 0; i < MEM_SIZE; i++)
     {
@@ -216,23 +210,45 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
             fprintf(object, "%04d\tA%x-B%x-C%x-D%x-E%x\n", i, 
                 memory[i].quarter.A, memory[i].quarter.B, memory[i].quarter.C, memory[i].quarter.D, memory[i].quarter.E);
     }
+    fclose(object);
 
-    /* Make entries and external files */
+    /* Generate externals file */
     for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
     {
         if (labelP->attribute.type == external)
         {
-            fprintf(externals, "%s BASE %d\n", labelP->name, labelP->base);
-            fprintf(externals, "%s OFFSET %d\n", labelP->name, labelP->offset);
+            externals = fopen(strcat(strcpy(argv, fileName), ".ext"), "w");
+            fseek(externals, 0, SEEK_SET);
+            for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+            {
+                if (labelP->attribute.type == external)
+                {
+                    fprintf(externals, "%s BASE %04d\n", labelP->name, labelP->base);
+                    fprintf(externals, "%s OFFSET %04d\n", labelP->name, labelP->offset);
+                }
+            }
+            fclose(externals);
+            break;
         }
-
-        if (labelP->attribute.type == entry)
-            fprintf(entries, "%s,%d,%d\n", labelP->name, labelP->base, labelP->offset);
     }
 
-    fclose(object);
-    fclose(entries);
-    fclose(externals);
+    /* Generate entries file */
+    for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+    {
+        if (labelP->attribute.type == entry)
+        {
+            entries = fopen(strcat(strcpy(argv, fileName), ".ent"), "w");
+            fseek(entries, 0, SEEK_SET);
+            for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
+            {
+                if (labelP->attribute.type == entry)
+                        fprintf(entries, "%s, %04d, %04d\n", labelP->name, labelP->base, labelP->offset);
+            }
+            fclose(entries);
+            break;
+        }
+    }
+
     free(argv);
     return;
 }
