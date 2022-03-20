@@ -4,7 +4,7 @@
 Word memory[MEM_SIZE];
 int IC = IC_START, DC = DC_START;
 Label firstLabel = {"", 0, 0, 0, {0, 0}, NULL};
-Label *labelPointer = &firstLabel;
+Label *lastLabelP = &firstLabel;
 int memLoc = IC_START;
 int lineCount = 0;
 bool firstErrors = false;
@@ -29,10 +29,11 @@ Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true}, 
 bool firstPass(char *fileName)
 {
     FILE *text;
+    Label *labelPointer;
     char line[MAX_LINE];
     char *startP;
     char *endP;
-    char *labelName = (char *)malloc(sizeof(char *));
+    char *labelName = " ";
     bool labelFlag = false;
     int i;
 
@@ -68,24 +69,35 @@ bool firstPass(char *fileName)
             continue;
 
 
-        while (endP[1] != ' ')
+        while (!isspace(*endP) && *endP != ':')
             endP++;
 
         /* Locating labels */
         if (*endP == ':')
         {
+            if (!isspace(endP[1]))
+            {
+                printf("ERROR: [%d] A space must follow a label name\n", lineCount);
+                firstErrors = true;
+                continue;
+            }
             labelFlag = true;
             labelName = (char *)calloc((endP-startP), sizeof(char));
             for (i = 0; startP[i] != ':'; i++)
                 labelName[i] = startP[i];
             
-            CHECK_LABEL_NAME
-
+            if (!nameCheck(labelName))
+            {
+                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName);
+                firstErrors = true;
+                continue;
+            }
+            
             startP = ++endP;
         }
 
         startP = skipWhiteSpaces(startP);
-
+        
         /* Handling data encoding */
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)))
         {
@@ -106,22 +118,52 @@ bool firstPass(char *fileName)
 
         /* Entry type handled in second pass */
         if (!strncmp(startP, ENTRY, strlen(ENTRY)))
+        {
             continue;
+        }
 
         /* Handling extern type */
         if (!strncmp(startP, EXTERN, strlen(EXTERN)))
         {
-            labelName = (char *)malloc(sizeof(endP+2));
-            strcpy(labelName, endP+2);
+            labelName = (char *)malloc(sizeof(endP+1));
+            strcpy(labelName, endP+1);
             for (i = 0; i < strlen(labelName); i++)
             {
                 if (isspace(labelName[i]))
                     labelName[i] = '\0';
             }
             
-            CHECK_LABEL_NAME
+            if (!nameCheck(labelName))
+            {
+                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName);
+                firstErrors = true;
+                continue;
+            }
 
-            labelFlag = assignLabel(labelName, none, external, 0);
+            labelPointer = &firstLabel;
+            while (labelPointer != lastLabelP)
+            {
+                if (!strcmp(lastLabelP->name, labelName))
+                {
+                    if (lastLabelP->attribute.type == entry)
+                    {
+                        printf("ERROR: [%d] Label \"%s\" is already called as entry label\n", lineCount, labelName);
+                        firstErrors = true;
+                        break;
+                    }
+                    else
+                    {
+                        printf("WARNING: [%d] Label \"%s\" is already called as external label\n", lineCount, labelName);
+                        labelPointer = lastLabelP;
+                        break;
+                    }
+                }
+                labelPointer = labelPointer->next;
+            }
+            
+            if (labelPointer == lastLabelP)
+                labelFlag = assignLabel(labelName, none, external, 0);
+            free(labelName);
             continue;
         }
         
@@ -137,22 +179,24 @@ bool firstPass(char *fileName)
     
     fclose(text);
     if (!firstErrors) 
-        secondPass(memory, IC, DC, firstLabel, labelPointer, fileName);
+        secondPass(memory, IC, DC, firstLabel, lastLabelP, fileName);
+    else
+        remove("output.txt");
     return firstErrors;
 }
 
 bool assignLabel(char *name, location attrLoc, type attrType, int memo)
 {
-    labelPointer->name = (char *)malloc(sizeof(name));
-    strcpy(labelPointer->name, name);
-    labelPointer->value = memo;
-    labelPointer->base = (memo/16)*16;
-    labelPointer->offset = memo%16;
-    labelPointer->attribute.location = attrLoc;
-    labelPointer->attribute.type = attrType;
-    labelPointer->next = (Label *)malloc(sizeof(Label));
-    labelPointer = labelPointer->next;
-    labelPointer->name = "";
+    lastLabelP->name = (char *)malloc(sizeof(name));
+    strcpy(lastLabelP->name, name);
+    lastLabelP->value = memo;
+    lastLabelP->base = (memo/16)*16;
+    lastLabelP->offset = memo%16;
+    lastLabelP->attribute.location = attrLoc;
+    lastLabelP->attribute.type = attrType;
+    lastLabelP->next = (Label *)malloc(sizeof(Label));
+    lastLabelP = lastLabelP->next;
+    lastLabelP->name = "";
     return false;
 }
 
@@ -211,7 +255,7 @@ void codeData(char *p)
         num = atoi(p);
         if (fabs(num) > 32767)
         {
-            printf("[%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
+            printf("ERROR: [%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
             firstErrors = true;
             return;
         }
@@ -246,7 +290,7 @@ void removeSpaces(char *str)
 bool tableSearch(char *name)
 {
     Label *labelP = &firstLabel;
-    while (labelP != labelPointer)
+    while (labelP != lastLabelP)
     {
         if (!strcmp(labelP->name, name))
             return false;
@@ -263,12 +307,37 @@ int analizeCode(char *codeLine)
 	int i, j, L = 1, l;
     Instruction instruct;
     direction dir;
-	
+
+    for (i = 0; i < strlen(codeLine); i++)
+    {
+        if (codeLine[i] == ',')
+        {
+            if (codeLine[i+1] ==  ',')
+            {
+                printf("ERROR: [%d] Excessive commas\n", lineCount);
+                return 0;
+            }
+            for (i++; i < strlen(codeLine); i++)
+            {
+                if (!isspace(codeLine[i]))
+                    break;
+            }
+            if (i >= strlen(codeLine)-1)
+            {
+                printf("ERROR: [%d] Extra comma at end of line\n", lineCount);
+                return 0;
+            }
+        }
+    }
+
     for (i = 0; i < size; i++)
     {
         instruct = instructions[i];
         if (strlen(codeLine) >= strlen(instruct.name) && !strncmp(codeLine, instruct.name, strlen(instruct.name)))
         {
+            if (!isspace(codeLine[strlen(instruct.name)]) && codeLine[strlen(instruct.name)] != '\0')
+                break;
+
             for (j = 0; codeLine[j] != ' ' && codeLine[j] != '\t' && codeLine[j] != '\n'; j++); /* Skips instruction */
             codeLine = skipWhiteSpaces(codeLine+j); /* Ignoring white space after instruction */
             codeLine[strlen(codeLine)-1] = '\0'; /* Removing \n from the end for convenience */
@@ -282,7 +351,7 @@ int analizeCode(char *codeLine)
             /* There never is a third operand, error if there is */
             if (strtok(NULL, ct) != NULL) 
             {
-                printf("[%d] Too many operands!\n", lineCount);
+                printf("ERROR: [%d] Too many operands!\n", lineCount);
                 return 0;
             }
 
@@ -292,7 +361,7 @@ int analizeCode(char *codeLine)
             {
                 if (firstOp != NULL)
                 {
-                    printf("[%d] Extraneous text after instruction!\n", lineCount);
+                    printf("ERROR: [%d] Extraneous text after instruction!\n", lineCount);
                     return 0;
                 }
                     return L;
@@ -306,7 +375,13 @@ int analizeCode(char *codeLine)
             /* If only one operand needed, error occures if even second operand exists */
             if (instruct.numOfOps == 1 && secondOp != NULL)
             {
-                printf("[%d] Too many operands!\n", lineCount);
+                printf("ERROR: [%d] Only one operand is needed for instruction \"%s\"\n", lineCount, instruct.name);
+                return 0;
+            }
+
+            if (instruct.numOfOps == 2 && (secondOp == NULL || firstOp == NULL))
+            {
+                printf("ERROR: [%d] Missing operands for instruction \"%s\"\n", lineCount, instruct.name);
                 return 0;
             }
 
@@ -321,7 +396,7 @@ int analizeCode(char *codeLine)
                     {
                         if (!isspace(firstOp[i]))
                         {
-                            printf("[%d] Missing comma!\n", lineCount);
+                            printf("ERROR: [%d] Missing comma\n", lineCount);
                             return 0;
                         }
                     }
@@ -346,7 +421,15 @@ int analizeCode(char *codeLine)
         }
     }
     /* Looped through entire instruction list and not found a correct instruction */
-	printf("[%d] Unknown intsruction! %s\n", lineCount, codeLine);
+    for (i = 0; i < strlen(codeLine); i++)
+    {
+        if (isspace(codeLine[i]))
+        {
+            codeLine[i] = '\0';
+            break;
+        }
+    }
+	printf("ERROR: [%d] Unknown intsruction! \"%s\"\n", lineCount, strtok(codeLine, ""));
     return 0;
 }
 
@@ -367,7 +450,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         {
             if (!isdigit(operand[j]) && !isspace(operand[j]))
             {
-                printf("[%d] A whole number must follow up a # prefix!\n", lineCount);
+                printf("ERROR: [%d] A whole number must follow up a # prefix!\n", lineCount);
                 return -1;
             }
             if (isspace(operand[j]))
@@ -376,7 +459,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 {
                     if (!isspace(operand[j]))
                     {
-                        printf("[%d] Missing comma!\n", lineCount);
+                        printf("ERROR: [%d] Missing comma!\n", lineCount);
                         return -1;
                     }
                 }
@@ -388,7 +471,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             number = atoi(operand+1);
             if (fabs(number) > 32767)
             {
-                printf("[%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
+                printf("ERROR: [%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
                 return -1;
             }
             memory[memLoc+L].number = number;
@@ -398,7 +481,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 memory[memLoc+1].opcode.origMode = immediate;
             return 1;
         }
-        printf("[%d] instruction doesnt support immidiate addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+        printf("ERROR: [%d] instruction doesnt support immidiate addressing mode for %s operand\n", lineCount, DIRECTION(dir));
         return -1;
     }
     /* Check if operand is a register or a label
@@ -416,7 +499,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 {
                     if (!isspace(operand[j]))
                     {
-                        printf("[%d] Missing comma!\n", lineCount);
+                        printf("ERROR: [%d] Missing comma!\n", lineCount);
                         return -1;
                     }
                 }
@@ -426,7 +509,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
             {
                 if (!isalpha(operand[j]) && !isspace(operand[j]))
                 {
-                    printf("[%d] Illegal character in label name!\n", lineCount);
+                    printf("ERROR: [%d] Illegal character in label name!\n", lineCount);
                     return -1;
                 }
                 isLabel = true;
@@ -453,7 +536,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                     }
                     return 0;
                 }
-                printf("[%d] instruction doesnt support direct register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+                printf("ERROR: [%d] instruction doesnt support direct register addressing mode for %s operand\n", lineCount, DIRECTION(dir));
                 return -1;
             }
         }
@@ -461,7 +544,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     
     if (!isalpha(*operand))
     {
-        printf("[%d] Illegal starting character in label name!\n", lineCount);
+        printf("ERROR: [%d] Illegal starting character in label name!\n", lineCount);
         return -1;
     }
 
@@ -472,16 +555,21 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         {
             if (operand[j+1] != 'r' || !isdigit(operand[j+2]) || (!isdigit(operand[j+3]) && operand[j+3] != ']'))
             {
-                printf("[%d] Unkown register name\n", lineCount);
+                printf("ERROR: [%d] Unkown register name\n", lineCount);
                 return -1;
             }
             if (operand[j+3] != ']' && (j+4 < strlen(operand) && operand[j+4] != ']'))
             {
-                printf("[%d] Missing closing square bracket\n", lineCount);
+                printf("ERROR: [%d] Missing closing square bracket\n", lineCount);
                 return -1;
             }
 
             number = atoi(operand+j+2);
+            if (number < 10 || number > 15)
+            {
+                printf("ERROR: [%d] Unkown register name\n", lineCount);
+                return -1;
+            }
 
             if (modes[index])
             {
@@ -498,7 +586,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 return 2;
             }
 
-            printf("[%d] Instruction doesn't support index addressing mode for %s operand\n", lineCount, DIRECTION(dir));
+            printf("ERROR: [%d] Instruction doesn't support index addressing mode for %s operand\n", lineCount, DIRECTION(dir));
             return -1;
         }
     }
@@ -512,6 +600,6 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         return 2;
     }
 
-    printf("[%d] instruction doesnt support direct addressing modes for %s operand\n", lineCount, DIRECTION(dir));
+    printf("ERROR: [%d] instruction doesnt support direct addressing modes for %s operand\n", lineCount, DIRECTION(dir));
     return -1;
 }

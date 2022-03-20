@@ -7,9 +7,9 @@
 #include <ctype.h>
 #include <math.h>
 
-#define MAX_LINE 81				 /*Maximum allowed length of line*/
-#define MAX_MACRO_SIZE 6 * MAX_LINE /*Maximum length allowed of macro*/
-#define MEM_SIZE 8192               /*Virtual computer's memory size*/
+#define MAX_LINE 81				 /* Maximum allowed length of line */
+#define MAX_MACRO_SIZE 6 * MAX_LINE /* Maximum length allowed of macro */
+#define MEM_SIZE 8192               /* Virtual computer's memory size */
 
 typedef enum boolean
 {
@@ -77,5 +77,12 @@ typedef struct Instruction
      bool origModes[4];
      bool destModes[4];
 } Instruction;
+
+typedef struct Externals
+{
+     char *name;
+     int address;
+} Externals;
+
 
 #endif
