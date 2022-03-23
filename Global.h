@@ -10,6 +10,7 @@
 #define MAX_LINE 81				 /* Maximum allowed length of line */
 #define MAX_MACRO_SIZE 6 * MAX_LINE /* Maximum length allowed of macro */
 #define MEM_SIZE 8192               /* Virtual computer's memory size */
+#define MAX_LABEL 31                /* Maximum length of label name */
 
 typedef enum boolean
 {

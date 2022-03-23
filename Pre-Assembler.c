@@ -19,7 +19,6 @@ bool preAssembler(char *argv)
      if (fp == NULL)
      {
           printf("Error trying to open %s\n", fileName);
-          printf("The program will continue to the next file\n");
           return false;
      }
      fseek(fp, 0, SEEK_SET);
@@ -33,6 +32,8 @@ bool preAssembler(char *argv)
      /*Process the code line by line*/
      while (fgets(line, MAX_LINE, fp) != NULL)
      {
+          if (line[strlen(line)-1] != '\n' && strlen(line) == MAX_LINE-1)
+               fprintf(output, "-");
           printLine = true;
           p = line;
           p = skipWhiteSpace(p);
@@ -72,7 +73,7 @@ bool preAssembler(char *argv)
                i++;
           }
      }
-     
+     fprintf(output, "\n");
      free(fileName);
      fclose(fp);
      fclose(output);

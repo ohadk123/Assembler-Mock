@@ -7,7 +7,7 @@ bool secondErrors = false;
 Externals *externalsList;
 size_t externListSize = 0;
 
-void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName)
+void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName, bool firstErrors)
 {
     FILE *text;
     char line[MAX_LINE];
@@ -16,8 +16,7 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
     char *labelName = (char *)malloc(sizeof(char *));
     int i;
     for (memLoc = IC_START; memory[memLoc].opcode.A != 0; memLoc++);
-    
-    externalsList = (Externals *)malloc(0);
+    secondErrors = firstErrors;
 
     /* Opening the processed code */
     text = fopen("output.txt", "r");
@@ -50,14 +49,14 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
             continue;
 
 
-        while (endP[1] != ' ')
+        while (!isspace(endP[1]))
             endP++;
-
+        
         /* Skipping labels */
         if (*endP == ':')
-            startP = ++endP;
+            startP = endP + 1;
         startP = skipWhiteSpaces(startP);
-
+        
         /* Skip data, string and extern */
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)) || !strncmp(startP, EXTERN, strlen(EXTERN)))
             continue;
@@ -65,52 +64,74 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
         /* Add entry attribute to label */
         if (!strncmp(startP, ENTRY, strlen(ENTRY)))
         {
-            labelName = (char *)malloc(sizeof(endP+2));
-            strcpy(labelName, endP+2);
+            if (*endP == ':')
+                printf("WARNING: [%d] Label is ignored\n", lineCount);
+            
+            labelName = (char *)malloc(sizeof(startP));
+            startP += strlen(ENTRY);
+            startP = skipWhiteSpaces(startP);
+            strcpy(labelName, startP);
+            if (!isalpha(*labelName))
+            {
+                printf("ERROR: [%d] Label name must start with a letter\n", lineCount);
+                secondErrors = true;
+                continue;
+            }
             if (labelName[strlen(labelName)-1] == '\n')
                 labelName[strlen(labelName)-1] = '\0';
-            secondErrors = codeEntry(&firstLabel, lastLabel, labelName);
+            
+            secondErrors = codeEntry(&firstLabel, lastLabel, labelName) || secondErrors;
             continue;
         }
 
-        for (i = 0; *startP != ' ' && *startP != '\n' && *startP != '\t'; i++, startP++);
         if (*startP == '\n')
             continue;
         startP = skipWhiteSpaces(startP);
         
-        codeLine(memory, startP, lastLabel, &firstLabel);
+        if (!firstErrors)
+            codeLine(memory, startP, lastLabel, &firstLabel);
     }
-    remove ("output.txt");
 
+    remove ("output.txt");
     if (!secondErrors)
         outputFile(memory, &firstLabel, lastLabel, ICF, DCF, fileName);
     else
-        remove(strcat(fileName, ".am"));
+        printf("Processing file %s.as failed\n", fileName);
 
     return;
 }
 
 bool codeEntry(Label *labelP, Label *lastLabel ,char *name)
 {
-    while (labelP != lastLabel)
+    while (labelP != lastLabel && labelP != NULL)
     {
         if (!strcmp(labelP->name, name))
+        {
+            if (labelP->attribute.type == external)
+            {
+                printf("ERROR: [%d] External Label \"%s\" can't also be entry\n", lineCount, name);
+                return false;
+            }
+            else
             {
                 labelP->attribute.type = entry;
                 return false;
             }
+        }
         labelP = labelP->next;
     }
-    printf("[%d] Label %s is not used!\n", lineCount, name);
+    printf("ERROR: [%d] Label %s is not used!\n", lineCount, name);
     return true;
 }
 
 void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
 {
-    int i;
+    int i, regNum;
     char *ct = ",";
     char *firstOp;
     char *secondOp;
+    while (*line && !isspace(*line)) line++;
+    line = skipWhiteSpaces(line);
 
     line[strlen(line)-1] = '\0'; /* Removing \n from the end for convenience */
     firstOp = strtok(line, ct); /* First operand */
@@ -133,12 +154,18 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     {
         for (i = 1; i < strlen(firstOp); i++)
             if (isalpha(firstOp[i]))
-                secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp);
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp) || secondErrors;
+        if (i == strlen(firstOp))
+        {
+            regNum = atoi(firstOp+1);
+            if (regNum < 0 || regNum > 15)
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp) || secondErrors;
+        }
     }
     else
     {
         firstOp = strtok(firstOp, "[");
-        secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp);
+        secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp) || secondErrors;
     }
 
     if (secondOp == NULL)
@@ -151,14 +178,20 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     if (*secondOp == '#');
     else if (*secondOp == 'r')
     {
-        for (i = 1; i <strlen(secondOp); i++)
+        for (i = 1; i < strlen(secondOp); i++)
             if (isalpha(secondOp[i]))
-                secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp) || secondErrors;
+        if (i == strlen(secondOp))
+        {
+            regNum = atoi(secondOp+1);
+            if (regNum < 0 || regNum > 15)
+                secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp) || secondErrors;
+        }
     }
     else
     {
         secondOp = strtok(secondOp, "[");
-        secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp);
+        secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp) || secondErrors;
     }
 
     for (; memory[memLoc].quarter.A != 0; memLoc++);
@@ -167,7 +200,17 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
 
 bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
 {
-    for (; labelP != lastLabel; labelP = labelP->next)
+    int i;
+    /* Removing white space from end of name */
+    for (i = strlen(name)-1; i > 0; i--)
+    {
+        if (isspace(name[i]))
+            name[i] = '\0';
+    }
+
+    /* Searching for the label from list of initiallized labels
+     * If label is external we add the line address to the externals list */
+    for (; labelP != lastLabel && labelP != NULL; labelP = labelP->next)
     {
         if (!strcmp(labelP->name, name))
         {
@@ -176,9 +219,8 @@ bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
             case (external) :
                 memory[memLoc].opcode.E = 1;
                 memory[memLoc+1].opcode.E = 1;
-                labelP->base = memLoc;
-                labelP->offset = memLoc+1;
-                externalsList = realloc(externalsList, sizeof(externalsList) + sizeof(Externals));
+                externalsList = realloc(externalsList, sizeof(Externals) * (externListSize + 1));
+                externalsList[externListSize].name = malloc(sizeof(char *));
                 strcpy(externalsList[externListSize].name, name);
                 externalsList[externListSize].address = memLoc;
                 externListSize++;
@@ -194,7 +236,7 @@ bool getLabel(Word *memory, Label *lastLabel, Label *labelP, char *name)
         }
     }
     
-    printf("[%d] label name \"%s\" is not recognized\n", lineCount, name);
+    printf("ERROR: [%d] label name \"%s\" is not recognized\n", lineCount, name);
     return false;
 }
 
@@ -237,8 +279,8 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
             if (labelP->attribute.type == entry)
                 fprintf(entries, "%s, %04d, %04d\n", labelP->name, labelP->base, labelP->offset);
         }
+        fclose(entries);
     }
-    fclose(entries);
 
     fileName[nameLen] = '\0';
     if (externListSize > 0)
@@ -250,7 +292,10 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
             fprintf(externals, "%s BASE %04d\n", externalsList[i].name, externalsList[i].address);
             fprintf(externals, "%s OFFSET %04d\n\n", externalsList[i].name, externalsList[i].address+1);
         }
+        free(externalsList);
+        fclose(externals);
     }
-    fclose(externals);
+
+    printf("Processing file %s.as succeeded\n", fileName);
     return;
 }

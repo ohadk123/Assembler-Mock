@@ -47,13 +47,26 @@ bool firstPass(char *fileName)
     }
     fseek(text, 0, SEEK_SET);
 
-    while (fgets(line, MAX_LINE, text) != NULL)
+    while (fgets(line, MAX_LINE+10, text) != NULL)
     {
+        if (IC + DC > MEM_SIZE)
+        {
+            printf("ERROR: Program is too big!\n");
+            return true; 
+        }
 
         labelName = " ";
         startP = line;
         endP = line;
         labelFlag = false;
+
+        if (*startP == '-')
+        {
+            lineCount = atoi(startP+1);
+            printf("ERROR: [%d] Line is too long, max line length is %d\n", lineCount, MAX_LINE);
+            firstErrors = true;
+            continue;
+        }
 
         if (isdigit(*startP))
         {
@@ -71,7 +84,7 @@ bool firstPass(char *fileName)
 
         while (!isspace(*endP) && *endP != ':')
             endP++;
-
+        
         /* Locating labels */
         if (*endP == ':')
         {
@@ -86,16 +99,24 @@ bool firstPass(char *fileName)
             for (i = 0; startP[i] != ':'; i++)
                 labelName[i] = startP[i];
             
-            if (!nameCheck(labelName))
+            CHECK_LABEL_NAME
+            for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
             {
-                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName);
-                firstErrors = true;
-                continue;
+                if (!strcmp(labelPointer->name, labelName) && labelPointer->attribute.location == code)
+                {
+                    printf("ERROR: [%d] Label \"%s\" is already declared\n", lineCount, labelName);
+                    firstErrors = 3;
+                    break;
+                }
             }
             
             startP = ++endP;
         }
-
+        if (firstErrors == 3)
+        {
+            firstErrors = true;
+            continue;
+        }
         startP = skipWhiteSpaces(startP);
         
         /* Handling data encoding */
@@ -106,12 +127,23 @@ bool firstPass(char *fileName)
 
             if (!strncmp(startP, DATA, strlen(DATA)))
             {
-                removeSpaces(startP);
+                if (!isspace(startP[strlen(DATA)]))
+                {
+                    printf("ERROR: [%d] White space must come after .data call\n", lineCount);
+                    firstErrors = true;
+                    continue;
+                }
                 codeData(startP + strlen(DATA));
             }
             else
             {
-                codeString(startP + strlen(STRING) + 2);
+                if (!isspace(startP[strlen(STRING)]))
+                {
+                    printf("ERROR: [%d] White space must come after .string call\n", lineCount);
+                    firstErrors = true;
+                    continue;
+                }
+                codeString(startP + strlen(STRING));
             }
             continue;
         }
@@ -126,47 +158,68 @@ bool firstPass(char *fileName)
         if (!strncmp(startP, EXTERN, strlen(EXTERN)))
         {
             labelName = (char *)malloc(sizeof(endP+1));
-            strcpy(labelName, endP+1);
-            for (i = 0; i < strlen(labelName); i++)
+            endP = skipWhiteSpaces(endP);
+            strcpy(labelName, endP);
+            if (!isalpha(*labelName))
             {
-                if (isspace(labelName[i]))
-                    labelName[i] = '\0';
-            }
-            
-            if (!nameCheck(labelName))
-            {
-                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName);
+                printf("ERROR: [%d] Label name must start with a letter\n", lineCount);
                 firstErrors = true;
                 continue;
             }
-
-            labelPointer = &firstLabel;
-            while (labelPointer != lastLabelP)
+            i = 0;
+            while (!isspace(labelName[++i]));
+            startP = labelName + i;
+            startP = skipWhiteSpaces(startP);
+            if (*startP != '\n')
             {
-                if (!strcmp(lastLabelP->name, labelName))
+                printf("ERROR: [%d] Extraneous text after label name\n", lineCount);
+                firstErrors = true;
+                continue;
+            }
+            labelName[i] = '\0';
+            
+            CHECK_LABEL_NAME
+
+            for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
+            {
+                if (!strcmp(labelPointer->name, labelName))
                 {
-                    if (lastLabelP->attribute.type == entry)
+                    if (labelPointer->attribute.location != none)
                     {
-                        printf("ERROR: [%d] Label \"%s\" is already called as entry label\n", lineCount, labelName);
+                        printf("ERROR: [%d] External label \"%s\" can't be data or code\n", lineCount, labelName);
                         firstErrors = true;
                         break;
                     }
-                    else
+                    else if (labelPointer->attribute.type == external)
                     {
-                        printf("WARNING: [%d] Label \"%s\" is already called as external label\n", lineCount, labelName);
-                        labelPointer = lastLabelP;
+                        printf("WARNING: [%d] Label \"%s\" is already declared as external\n", lineCount, labelName);
                         break;
                     }
                 }
-                labelPointer = labelPointer->next;
             }
-            
             if (labelPointer == lastLabelP)
                 labelFlag = assignLabel(labelName, none, external, 0);
             free(labelName);
             continue;
         }
         
+        for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
+        {
+            if (!strcmp(labelPointer->name, labelName))
+            {
+                if (labelPointer->attribute.location == data)
+                {
+                    printf("ERROR: [%d] code Label \"%s\" can't also be data\n", lineCount, labelName);
+                    firstErrors = true;
+                    labelFlag = false;
+                }
+                else
+                {
+                    labelPointer->attribute.location = code;
+                    labelFlag = false;
+                }
+            }
+        }
         if (labelFlag)
             labelFlag = assignLabel(labelName, code, none, memLoc);
         
@@ -178,10 +231,7 @@ bool firstPass(char *fileName)
     }
     
     fclose(text);
-    if (!firstErrors) 
-        secondPass(memory, IC, DC, firstLabel, lastLabelP, fileName);
-    else
-        remove("output.txt");
+    secondPass(memory, IC, DC, firstLabel, lastLabelP, fileName, firstErrors);
     return firstErrors;
 }
 
@@ -231,16 +281,43 @@ char *skipWhiteSpaces(char *p)
 
 void codeString(char *p)
 {
-    while(*p)
+    char *quote;
+    p = skipWhiteSpaces(p);
+    if (*p != '\"')
     {
-        if (*p == 34)
-            break;
+        printf("ERROR: [%d] String must be inside quotation marks\n", lineCount);
+        firstErrors = true;
+        return;
+    }
+    p++;
+    quote = strstr(p, "\"");
+    if (quote == NULL)
+    {
+        printf("ERROR: [%d] String must be inside quotation marks\n", lineCount);
+        firstErrors = true;
+        return;
+    }
+
+    while(p != quote)
+    {
         memory[memLoc].opcode.A = 1;
         memory[memLoc].number = *p;
         memLoc++;
         DC++;
         p++;
     }
+    p++;
+    while (*p)
+    {
+        if (!isspace(*p))
+        {
+            printf("ERROR: [%d] Extraneous text after closing quotation marks\n", lineCount);
+            firstErrors = true;
+            return;
+        }
+        p++;
+    }
+
     memory[memLoc].opcode.A = 1;
     memory[memLoc].number = 0;
     memLoc++;
@@ -249,13 +326,27 @@ void codeString(char *p)
 
 void codeData(char *p)
 {
-    int num, i;
+    int num;
+    p = skipWhiteSpaces(p);
+    if (!strcmp(p, "\n"))
+    {
+        printf("ERROR: [%d] Expecting numbers after .data\n", lineCount);
+        firstErrors = true;
+        return;
+    }
     while (true)
     {
+        p = skipWhiteSpaces(p);
+        if (*p == ',')
+        {
+            printf("ERROR: [%d] Missing number\n", lineCount);
+            firstErrors = true;
+            return;
+        }
         num = atoi(p);
         if (fabs(num) > 32767)
         {
-            printf("ERROR: [%d] Numerical value must not exceed 16 bits (+-32767)!\n", lineCount);
+            printf("ERROR: [%d] Numerical value must not exceed 16 bits (+-32767)\n", lineCount);
             firstErrors = true;
             return;
         }
@@ -263,14 +354,22 @@ void codeData(char *p)
         memory[memLoc].number = num;
         memLoc++;
         DC++;
-        for (i = 0; p[i] != ',' && p[i] != '\n'; i++);
-        p += i;
+
+        while (isdigit(*++p));
+        p = skipWhiteSpaces(p);
         switch (*p)
         {
         case(',') :
             p++;
             break;
         case ('\n') :
+            return;
+        default :
+            if (!isdigit(*p))
+                printf("ERROR: [%d] Must have numbers after .data\n", lineCount);
+            else
+                printf("ERROR: [%d] Missing comma after %d\n", lineCount, num);
+            firstErrors = true;
             return;
         }
     }
@@ -429,6 +528,11 @@ int analizeCode(char *codeLine)
             break;
         }
     }
+    if (strtok(codeLine, "") == NULL)
+    {
+        printf("ERROR: [%d] Missing code after label\n", lineCount);
+        return 0;
+    }
 	printf("ERROR: [%d] Unknown intsruction! \"%s\"\n", lineCount, strtok(codeLine, ""));
     return 0;
 }
@@ -439,6 +543,12 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
     int j = 0;
     bool isLabel = false;
     int number;
+    
+    if (strlen(operand) > MAX_LABEL)
+    {
+        printf("ERROR: [%d] Label \"%s\" is too long, max label length is %d characters\n", lineCount, operand, MAX_LABEL);
+        return -1;
+    }
 
     /* Checks for immediate addressing mode
      * checks if it's actually a number, skips '-' if it exists

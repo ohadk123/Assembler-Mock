@@ -11,15 +11,15 @@
 #define ENTRY ".entry"
 
 #define CHECK_LABEL_NAME \
-            if (!nameCheck(labelName)) \
+            if (strlen(labelName) > MAX_LABEL) \
             { \
-                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName); \
+                printf("ERROR: [%d] Label \"%s\" is too long, max label length is %d characters\n", lineCount, labelName, MAX_LABEL); \
                 firstErrors = true; \
                 continue; \
             } \
-            if (!tableSearch(labelName)) \
+            if (!nameCheck(labelName)) \
             { \
-                printf("ERROR: [%d] Duplicate label name: %s\n", lineCount, labelName); \
+                printf("ERROR: [%d] Illegal label name: \"%s\"\n", lineCount, labelName); \
                 firstErrors = true; \
                 continue; \
             }

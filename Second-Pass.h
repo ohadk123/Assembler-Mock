@@ -3,7 +3,7 @@
 
 #include "Global.h"
 
-void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *symPointer, char *fileName);
+void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *symPointer, char *fileName, bool firstErrors);
 void codeLine(Word *memory, char *line, Label *symPointer, Label *firstLabel);
 bool getLabel(Word *memory, Label *labelPointer, Label *labelP, char *name);
 bool codeEntry(Label *symP, Label *symPointer , char *name);
