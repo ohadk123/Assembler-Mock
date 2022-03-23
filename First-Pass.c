@@ -3,12 +3,13 @@
 
 Word memory[MEM_SIZE];
 int IC = IC_START, DC = DC_START;
-Label firstLabel = {"", 0, 0, 0, {0, 0}, NULL};
-Label *lastLabelP = &firstLabel;
-int memLoc = IC_START;
-int lineCount = 0;
-bool firstErrors = false;
-int L;                                          /* {immid, direc, index, reg}    {immid, direc, index, reg} */
+Label firstLabel = {"", 0, 0, 0, {0, 0}, NULL}; /* First label in label heap */
+Label *lastLabelP = &firstLabel;                /* A pointer to the next to last label in label heap */
+int memLoc = IC_START;                          /* Memory location index */
+int lineCount = 0;                              /* Holds the line number for error output */
+bool firstErrors = false;                       /* True if errors are found in first pass */
+                                     
+                                                /* {immid, direc, index, reg}    {immid, direc, index, reg} */
 Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true},  {false, true,  true,  true}}, 
                               {"cmp", 1.0, 0, 2,   {true,  true,  true,  true},  {true,  true,  true,  true}},
                               {"add", 2.0, 10, 2,  {true,  true,  true,  true},  {false, true,  true,  true}},
@@ -28,16 +29,16 @@ Instruction instructions[] = {{"mov", 0.0, 0, 2,   {true,  true,  true,  true}, 
 
 bool firstPass(char *fileName)
 {
-    FILE *text;
-    Label *labelPointer;
-    char line[MAX_LINE];
-    char *startP;
-    char *endP;
-    char *labelName = " ";
-    bool labelFlag = false;
-    int i;
-
-    /* Opening the processed code */
+    FILE *text;             /* A pointer to the output file from pre-assembler process */
+    Label *labelPointer;    /* Points to a label from the label heap */
+    char line[MAX_LINE];    /* The line the programs is processing currently */
+    char *startP;           /* Points to the relavent start of the string */
+    char *lineP;            /* Used to search inside startP string */
+    char *labelName;        /* Holds a label name */
+    bool labelFlag = false; /* True if line start with label: call */
+    int i;                  /* Loops counter */
+    int L;                  /* Function analizeCode return value */
+    /* Opening the pre-assembled code */
     text = fopen("output.txt", "r");
     if (text == NULL)
     {
@@ -47,8 +48,9 @@ bool firstPass(char *fileName)
     }
     fseek(text, 0, SEEK_SET);
 
-    while (fgets(line, MAX_LINE+10, text) != NULL)
+    while (fgets(line, MAX_LINE, text) != NULL)
     {
+        /* Memory size exceeds virtual computer's memory size */
         if (IC + DC > MEM_SIZE)
         {
             printf("ERROR: Program is too big!\n");
@@ -57,9 +59,10 @@ bool firstPass(char *fileName)
 
         labelName = " ";
         startP = line;
-        endP = line;
+        lineP = line;
         labelFlag = false;
 
+        /* From Pre-Assembler, if line start with '-' the line is too long */
         if (*startP == '-')
         {
             lineCount = atoi(startP+1);
@@ -68,6 +71,7 @@ bool firstPass(char *fileName)
             continue;
         }
 
+        /* Reads line number to lineCount */
         if (isdigit(*startP))
         {
             lineCount = atoi(startP);
@@ -75,44 +79,45 @@ bool firstPass(char *fileName)
                 startP++;
             if (*startP == ' ')
                 startP++;
-            endP = startP;
+            lineP = startP;
         }
 
+        /* Nothing to do with empty lines */
         if (!strcmp(startP, "\n") || strlen(startP) == 0)
             continue;
 
-
-        while (!isspace(*endP) && *endP != ':')
-            endP++;
+        
         
         /* Locating labels */
-        if (*endP == ':')
+        while (!isspace(*lineP) && *lineP != ':')
+            lineP++;
+        if (*lineP == ':')
         {
-            if (!isspace(endP[1]))
+            if (!isspace(lineP[1]))
             {
                 printf("ERROR: [%d] A space must follow a label name\n", lineCount);
                 firstErrors = true;
                 continue;
             }
             labelFlag = true;
-            labelName = (char *)calloc((endP-startP), sizeof(char));
-            for (i = 0; startP[i] != ':'; i++)
-                labelName[i] = startP[i];
+            labelName = (char *)calloc((lineP-startP), sizeof(char));
+            strncpy(labelName, startP, lineP-startP);
             
             CHECK_LABEL_NAME
+            /* Can't call the same label twice */
             for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
             {
                 if (!strcmp(labelPointer->name, labelName) && labelPointer->attribute.location == code)
                 {
                     printf("ERROR: [%d] Label \"%s\" is already declared\n", lineCount, labelName);
-                    firstErrors = 3;
+                    firstErrors = LABEL_DECLARED;
                     break;
                 }
             }
             
-            startP = ++endP;
+            startP = ++lineP;
         }
-        if (firstErrors == 3)
+        if (firstErrors == LABEL_DECLARED)
         {
             firstErrors = true;
             continue;
@@ -157,9 +162,9 @@ bool firstPass(char *fileName)
         /* Handling extern type */
         if (!strncmp(startP, EXTERN, strlen(EXTERN)))
         {
-            labelName = (char *)malloc(sizeof(endP+1));
-            endP = skipWhiteSpaces(endP);
-            strcpy(labelName, endP);
+            labelName = (char *)malloc(sizeof(lineP+1));
+            lineP = skipWhiteSpaces(lineP);
+            strcpy(labelName, lineP);
             if (!isalpha(*labelName))
             {
                 printf("ERROR: [%d] Label name must start with a letter\n", lineCount);
@@ -180,6 +185,7 @@ bool firstPass(char *fileName)
             
             CHECK_LABEL_NAME
 
+            /* Make sure label declared as external is not already of location code or data */
             for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
             {
                 if (!strcmp(labelPointer->name, labelName))
@@ -203,6 +209,7 @@ bool firstPass(char *fileName)
             continue;
         }
         
+        /* Make sure label of location code is not called as location data as well */
         for (labelPointer = &firstLabel; labelPointer != lastLabelP; labelPointer = labelPointer->next)
         {
             if (!strcmp(labelPointer->name, labelName))
@@ -223,6 +230,7 @@ bool firstPass(char *fileName)
         if (labelFlag)
             labelFlag = assignLabel(labelName, code, none, memLoc);
         
+        /* Line is of type instruction line */
         L = analizeCode(startP);
         if (L == 0)
             firstErrors = true;
@@ -373,29 +381,6 @@ void codeData(char *p)
             return;
         }
     }
-}
-
-void removeSpaces(char *str)
-{
-    int i, j;
-     for (i = 0, j = 0; str[i]; i++)
-     {
-          if (str[i] != ' ')
-               str[j++] = str[i];
-     }
-     str[j] = '\0';
-}
-
-bool tableSearch(char *name)
-{
-    Label *labelP = &firstLabel;
-    while (labelP != lastLabelP)
-    {
-        if (!strcmp(labelP->name, name))
-            return false;
-        labelP = labelP->next;
-    }
-    return true;
 }
 
 int analizeCode(char *codeLine)
