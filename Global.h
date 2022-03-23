@@ -57,7 +57,7 @@ typedef struct Label
      int value;
      int base;
      int offset;
-     struct attribute
+     struct
      {
           int location;
           int type;
