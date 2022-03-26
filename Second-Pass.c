@@ -9,12 +9,13 @@ size_t externListSize = 0;
 
 void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName, bool firstErrors)
 {
-    FILE *text;
-    char line[MAX_LINE];
-    char *startP;
-    char *endP;
-    char *labelName = (char *)malloc(sizeof(char *));
-    int i;
+    FILE *text;          /* File containing pre-assembler code */
+    char line[MAX_LINE]; /* Hold current line */
+    char *startP;        /* Pointer to relavent start of line */
+    char *lineP;         /* Used to search inside startP string */
+    char *labelName = (char *)malloc(sizeof(char *)); /* Name of label */
+
+    /* Find next free memory word */
     for (memLoc = IC_START; memory[memLoc].opcode.A != 0; memLoc++);
     secondErrors = firstErrors;
 
@@ -30,11 +31,12 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
 
     while (fgets(line, MAX_LINE, text) != NULL)
     {
-
+        /* Reset pointers */
         labelName = " ";
         startP = line;
-        endP = line;
+        lineP = line;
 
+        /* Read line number*/
         if (isdigit(*startP))
         {
             lineCount = atoi(startP);
@@ -42,57 +44,59 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
                 startP++;
             if (*startP == ' ')
                 startP++;
-            endP = startP;
+            lineP = startP;
         }
 
+        /* Empty line is ignored */
         if (!strcmp(startP, "\n") || strlen(startP) == 0)
             continue;
 
-
-        while (!isspace(endP[1]))
-            endP++;
+        /* Looking for start of instruction */
+        while (!isspace(lineP[1]))
+            lineP++;
         
         /* Skipping labels */
-        if (*endP == ':')
-            startP = endP + 1;
+        if (*lineP == ':')
+            startP = lineP + 1;
         startP = skipWhiteSpaces(startP);
         
-        /* Skip data, string and extern */
+        /* Skipping data, string and extern declarations */
         if (!strncmp(startP, DATA, strlen(DATA)) || !strncmp(startP, STRING, strlen(STRING)) || !strncmp(startP, EXTERN, strlen(EXTERN)))
             continue;
         
         /* Add entry attribute to label */
         if (!strncmp(startP, ENTRY, strlen(ENTRY)))
         {
-            if (*endP == ':')
+            if (*lineP == ':')
                 printf("WARNING: [%d] Label is ignored\n", lineCount);
             
+            /* Copy label name to string */
             labelName = (char *)malloc(sizeof(startP));
             startP += strlen(ENTRY);
             startP = skipWhiteSpaces(startP);
             strcpy(labelName, startP);
+
+            /* Label name must start with a letter */
             if (!isalpha(*labelName))
             {
                 printf("ERROR: [%d] Label name must start with a letter\n", lineCount);
                 secondErrors = true;
                 continue;
             }
+            /* Remove new line char from label name */
             if (labelName[strlen(labelName)-1] == '\n')
                 labelName[strlen(labelName)-1] = '\0';
             
             secondErrors = codeEntry(&firstLabel, lastLabel, labelName) || secondErrors;
             continue;
         }
-
-        if (*startP == '\n')
-            continue;
-        startP = skipWhiteSpaces(startP);
         
         if (!firstErrors)
             codeLine(memory, startP, lastLabel, &firstLabel);
     }
 
     remove ("output.txt");
+    /* Only if no errors occured, print output files */
     if (!secondErrors)
         outputFile(memory, &firstLabel, lastLabel, ICF, DCF, fileName);
     else
@@ -103,10 +107,12 @@ void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLab
 
 bool codeEntry(Label *labelP, Label *lastLabel ,char *name)
 {
+    /* Find label in label heap */
     while (labelP != lastLabel && labelP != NULL)
     {
         if (!strcmp(labelP->name, name))
         {
+            /* Label can't be both entry and external */
             if (labelP->attribute.type == external)
             {
                 printf("ERROR: [%d] External Label \"%s\" can't also be entry\n", lineCount, name);
@@ -126,31 +132,35 @@ bool codeEntry(Label *labelP, Label *lastLabel ,char *name)
 
 void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
 {
+    /* Note: Most error checks are in first pass, no error checks in this function */
     int i, regNum;
     char *ct = ",";
     char *firstOp;
     char *secondOp;
-    while (*line && !isspace(*line)) line++;
+
+    while (*line && !isspace(*line)) line++; /* Skip to first char */
     line = skipWhiteSpaces(line);
 
     line[strlen(line)-1] = '\0'; /* Removing \n from the end for convenience */
-    firstOp = strtok(line, ct); /* First operand */
+    firstOp = strtok(line, ct);  /* First operand */
     secondOp = strtok(NULL, ct); /* Second operand */
 
+    /* Zero op instructions are handled fully in first pass */
     if (firstOp == NULL)
     {
         for (; memory[memLoc].quarter.A != 0; memLoc++);
         return;
     }
 
+    /* Remove new line char from operand */
     for (i = 0; i < strlen(firstOp); i++)
     {
         if (isspace(firstOp[i]))
             firstOp[i] = '\0';
     }
 
-    if (*firstOp == '#');
-    else if (*firstOp == 'r')
+    if (*firstOp == '#'); /* Immidiate addressing mode handled fully in first pass */
+    else if (*firstOp == 'r') /* rXX can also be a label name, otherwise register handled fully in first pass */
     {
         for (i = 1; i < strlen(firstOp); i++)
             if (isalpha(firstOp[i]))
@@ -164,10 +174,11 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     }
     else
     {
-        firstOp = strtok(firstOp, "[");
+        firstOp = strtok(firstOp, "["); /* Label name in index addresing mode is before opening bracket */
         secondErrors = !getLabel(memory, lastLabel, firstLabel, firstOp) || secondErrors;
     }
 
+    /* Only one operand in line */
     if (secondOp == NULL)
     {
         for (; memory[memLoc].quarter.A != 0; memLoc++);
@@ -175,8 +186,8 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     }
     secondOp = skipWhiteSpaces(secondOp);
 
-    if (*secondOp == '#');
-    else if (*secondOp == 'r')
+    if (*secondOp == '#'); /* Immidiate addressing mode handled fully in first pass */
+    else if (*secondOp == 'r') /* rXX can also be a label name, otherwise register handled fully in first pass */
     {
         for (i = 1; i < strlen(secondOp); i++)
             if (isalpha(secondOp[i]))
@@ -190,7 +201,7 @@ void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel)
     }
     else
     {
-        secondOp = strtok(secondOp, "[");
+        secondOp = strtok(secondOp, "["); /* Label name in index addresing mode is before opening bracket */
         secondErrors = !getLabel(memory, lastLabel, firstLabel, secondOp) || secondErrors;
     }
 
@@ -249,6 +260,7 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
     FILE *entries;
     int nameLen = strlen(fileName);
     
+    /* Create and print memory to .ob file */
     object = fopen(strcat(fileName, ".ob"), "w");
     fseek(object, 0, SEEK_SET);
     fprintf(object, "\t\t\t%d\t%d\n", ICF-IC_START, DCF);
@@ -262,7 +274,9 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
     }
     fclose(object);
 
-    fileName[nameLen] = '\0';
+    fileName[nameLen] = '\0'; /* Remove extension from file name */
+
+    /* If there is an entry label, create and print to .ent file */
     for (labelP = firstLabel; labelP != lastLabel; labelP = labelP->next)
     {
         if (labelP->attribute.type == entry)
@@ -282,7 +296,9 @@ void outputFile(Word *memory, Label *firstLabel, Label *lastLabel, int ICF, int 
         fclose(entries);
     }
 
-    fileName[nameLen] = '\0';
+    fileName[nameLen] = '\0'; /* Remove extension from file name */
+
+    /* If there is an external label, create and print to .ext file */
     if (externListSize > 0)
     {
         externals = fopen(strcat(fileName, ".ext"), "w");

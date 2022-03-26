@@ -17,13 +17,12 @@
 void secondPass(Word *memory, int ICF, int DCF, Label firstLabel, Label *lastLabel, char *fileName, bool firstErrors);
 
 /**
- * @brief Add entry label to label heap
- * @param memory - Virtual computer memory array
- * @param line - Line string 
- * @param lastLabel - Pointer to last label in label heap
+ * @brief Add entry type to matching label in label heap
+ * @param labelP - Pointer to a label in label heap
  * @param firstLabel - Pointer to the first label in label heap
+ * @param name - Name of label
  */
-void codeLine(Word *memory, char *line, Label *lastLabel, Label *firstLabel);
+bool codeEntry(Label *labelP, Label *lastLabel ,char *name);
 
 /**
  * @brief Check line operands
