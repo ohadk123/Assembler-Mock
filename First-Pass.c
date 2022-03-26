@@ -291,6 +291,8 @@ void codeString(char *p)
 {
     char *quote;
     p = skipWhiteSpaces(p);
+
+    /* Check opening quotation mark */
     if (*p != '\"')
     {
         printf("ERROR: [%d] String must be inside quotation marks\n", lineCount);
@@ -299,6 +301,8 @@ void codeString(char *p)
     }
     p++;
     quote = strstr(p, "\"");
+
+    /* Check closing quotation mark */
     if (quote == NULL)
     {
         printf("ERROR: [%d] String must be inside quotation marks\n", lineCount);
@@ -306,6 +310,7 @@ void codeString(char *p)
         return;
     }
 
+    /* Goes through each character in the string and codes it's ascii value to the memory */
     while(p != quote)
     {
         memory[memLoc].opcode.A = 1;
@@ -315,6 +320,8 @@ void codeString(char *p)
         p++;
     }
     p++;
+
+    /* Error check for text after the string */
     while (*p)
     {
         if (!isspace(*p))
@@ -326,6 +333,7 @@ void codeString(char *p)
         p++;
     }
 
+    /* End of string word marker */
     memory[memLoc].opcode.A = 1;
     memory[memLoc].number = 0;
     memLoc++;
@@ -342,17 +350,18 @@ void codeData(char *p)
         firstErrors = true;
         return;
     }
+
     while (true)
     {
         p = skipWhiteSpaces(p);
-        if (*p == ',')
+        if (*p == ',') /* Number must come before a comma */
         {
             printf("ERROR: [%d] Missing number\n", lineCount);
             firstErrors = true;
             return;
         }
         num = atoi(p);
-        if (fabs(num) > 32767)
+        if (fabs(num) > 32767) /* Number limited to 16-bits in 2's complement */
         {
             printf("ERROR: [%d] Numerical value must not exceed 16 bits (+-32767)\n", lineCount);
             firstErrors = true;
@@ -363,16 +372,16 @@ void codeData(char *p)
         memLoc++;
         DC++;
 
-        while (isdigit(*++p));
+        while (isdigit(*++p)); /* Go to after the number */
         p = skipWhiteSpaces(p);
         switch (*p)
         {
-        case(',') :
+        case(',') : /* Another number */
             p++;
             break;
-        case ('\n') :
+        case ('\n') : /* End of line */
             return;
-        default :
+        default : /* Missing comma or a non-number character, both errors */
             if (!isdigit(*p))
                 printf("ERROR: [%d] Must have numbers after .data\n", lineCount);
             else
@@ -394,19 +403,19 @@ int analizeCode(char *codeLine)
 
     for (i = 0; i < strlen(codeLine); i++)
     {
-        if (codeLine[i] == ',')
+        if (codeLine[i] == ',') /* After comma cases */
         {
-            if (codeLine[i+1] ==  ',')
+            if (codeLine[i+1] ==  ',') /* Two consecutive commas (or more) */
             {
                 printf("ERROR: [%d] Excessive commas\n", lineCount);
                 return 0;
             }
-            for (i++; i < strlen(codeLine); i++)
+            for (i++; i < strlen(codeLine); i++) /* Reached next operand (or end of line) */
             {
                 if (!isspace(codeLine[i]))
                     break;
             }
-            if (i >= strlen(codeLine)-1)
+            if (i >= strlen(codeLine)-1) /* Reached the end of the line */
             {
                 printf("ERROR: [%d] Extra comma at end of line\n", lineCount);
                 return 0;
@@ -414,11 +423,13 @@ int analizeCode(char *codeLine)
         }
     }
 
+    /* Searching instruction from list */
     for (i = 0; i < size; i++)
     {
         instruct = instructions[i];
         if (strlen(codeLine) >= strlen(instruct.name) && !strncmp(codeLine, instruct.name, strlen(instruct.name)))
         {
+            /* Make sure a space is after the instruction and it's not end of line */
             if (!isspace(codeLine[strlen(instruct.name)]) && codeLine[strlen(instruct.name)] != '\0')
                 break;
 
@@ -428,6 +439,7 @@ int analizeCode(char *codeLine)
             firstOp = strtok(codeLine, ct); /* First operand */
             secondOp = strtok(NULL, ct); /* Second operand */
 
+            /* First instruction word in memory */
             memory[memLoc].opcode.A = 1;
             memory[memLoc].number = 1;
             memory[memLoc].number = memory[memLoc].number << instruct.opcode;
@@ -451,7 +463,7 @@ int analizeCode(char *codeLine)
                     return L;
             }
             
-            /*Funct word */
+            /* Funct word */
             L++;
             memory[memLoc+1].opcode.A = 1;
             memory[memLoc+1].opcode.funct = instruct.funct;
@@ -463,14 +475,18 @@ int analizeCode(char *codeLine)
                 return 0;
             }
 
+            /* For tweo operand instructions, make sure both operands are valid */
             if (instruct.numOfOps == 2 && (secondOp == NULL || firstOp == NULL))
             {
                 printf("ERROR: [%d] Missing operands for instruction \"%s\"\n", lineCount, instruct.name);
                 return 0;
             }
-
+        
+            /* For one operand instructions, first operand is destination, for two operands instructions it's origin*/
             dir = instruct.numOfOps == 1 ? destination : origin;
 
+            /* Find end of operand
+             * Make sure there isn't other characters after the operand */
             for (i = 0; i < strlen(firstOp); i++)
             {
                 if (isspace(firstOp[i]))
@@ -484,22 +500,24 @@ int analizeCode(char *codeLine)
                             return 0;
                         }
                     }
-                    firstOp[j] = '\0';
+                    firstOp[j] = '\0'; /* firstOperand is just the operand without white space */
                 }
             }
 
+            /* Count memory words for first operand */
             l = identifyAddressingMode(firstOp, instruct, dir ? instruct.destModes : instruct.origModes, dir, L);
-            if (l == -1)
+            if (l == -1) /* -1 is error in function */
                 return 0;
-            L += l;
+            L += l; /* Add to memory word count */
             if (instruct.numOfOps == 1) /* If only one operand needed we are done here */
                 return L;
-
+            
+            /* Count memory words for second operand */
             secondOp = skipWhiteSpaces(secondOp);
             l = identifyAddressingMode(secondOp, instruct, instruct.destModes, destination, L);
-            if (l == -1)
+            if (l == -1)/* -1 is error in function */
                 return 0;
-            L+= l;
+            L+= l; /* Add to memory word count */
             
             return L;
         }
@@ -513,11 +531,14 @@ int analizeCode(char *codeLine)
             break;
         }
     }
+    /* Must have code after code label declaretion */
     if (strtok(codeLine, "") == NULL)
     {
         printf("ERROR: [%d] Missing code after label\n", lineCount);
         return 0;
     }
+
+    /* Looped through entire instruction list and no match found */
 	printf("ERROR: [%d] Unknown intsruction! \"%s\"\n", lineCount, strtok(codeLine, ""));
     return 0;
 }
@@ -643,7 +664,10 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
         return -1;
     }
 
-    /* Check index addressing type */
+    /* Check index addressing type 
+     * Make sure brackets and register are valid
+     * Code the register to memory word
+     * index addressing mode uses 2 words */
     for (j = 1; j < strlen(operand); j++)
     {
         if (operand[j] == '[' && j+3 < strlen(operand))
@@ -659,7 +683,7 @@ int identifyAddressingMode(char *operand, Instruction instruct, bool *modes, dir
                 return -1;
             }
 
-            number = atoi(operand+j+2);
+            number = atoi(operand+j+2); /* Read register number */
             if (number < 10 || number > 15)
             {
                 printf("ERROR: [%d] Unkown register name\n", lineCount);
